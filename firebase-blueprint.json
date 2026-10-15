@@ -1,0 +1,19 @@
+{
+  "entities": {
+    "users": {
+      "title": "User Profile & Portfolio Data",
+      "description": "Contains user portfolio categories, assets, monthly records and settings",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "categories": { "type": "array" },
+        "assets": { "type": "array" },
+        "monthlyRecords": { "type": "array" },
+        "settings": { "type": "object" }
+      }
+    }
+  }
+}
