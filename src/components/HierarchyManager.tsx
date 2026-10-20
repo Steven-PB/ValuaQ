@@ -51,6 +51,7 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
   const [catRisk, setCatRisk] = useState<RiskLevel>('Medium');
   const [catColor, setCatColor] = useState('#3b82f6');
   const [catDesc, setCatDesc] = useState('');
+  const [catTargetPercent, setCatTargetPercent] = useState<number>(0);
 
   // Asset Modal State
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
@@ -131,12 +132,14 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
       setCatRisk(cat.riskLevel);
       setCatColor(cat.color || '#3b82f6');
       setCatDesc(cat.description || '');
+      setCatTargetPercent(cat.targetPercent ?? 0);
     } else {
       setEditingCategory(null);
       setCatName('');
       setCatRisk('Medium');
       setCatColor('#3b82f6');
       setCatDesc('');
+      setCatTargetPercent(0);
     }
     setIsCategoryModalOpen(true);
   };
@@ -154,6 +157,7 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
         riskLevel: catRisk,
         color: catColor,
         description: catDesc,
+        targetPercent: Number(catTargetPercent) || 0,
       });
     } else {
       onAddCategory({
@@ -161,6 +165,7 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
         riskLevel: catRisk,
         color: catColor,
         description: catDesc,
+        targetPercent: Number(catTargetPercent) || 0,
       });
     }
     setIsCategoryModalOpen(false);
@@ -309,11 +314,16 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
                       style={{ backgroundColor: cat.color }}
                     />
                     <div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                         <h4 className="text-base font-bold text-slate-100">{cat.name}</h4>
                         <span className={`px-2 py-0.5 text-[10px] font-semibold rounded border ${getRiskLevelBadgeClass(cat.riskLevel)}`}>
                           {cat.riskLevel} Risk
                         </span>
+                        {typeof cat.targetPercent === 'number' && cat.targetPercent > 0 && (
+                          <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-slate-800 text-emerald-400 border border-emerald-500/30 font-mono">
+                            Target: {cat.targetPercent}%
+                          </span>
+                        )}
                       </div>
                       {cat.description && (
                         <p className="text-xs text-slate-400 mt-0.5">{cat.description}</p>
@@ -458,6 +468,26 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
                     />
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-semibold mb-1">Target Portfolio Allocation % (Optional)</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    placeholder="e.g. 25"
+                    value={catTargetPercent || ''}
+                    onChange={(e) => setCatTargetPercent(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3 py-2 pr-8 text-xs font-mono font-bold focus:outline-none focus:border-emerald-500"
+                  />
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-500 font-mono text-xs">
+                    %
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1">Used by the Rebalancer to detect drift and plan deposits.</p>
               </div>
 
               <div>

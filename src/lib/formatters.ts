@@ -107,3 +107,39 @@ export function getRiskLevelColor(riskLevel: string): string {
       return '#64748b';
   }
 }
+
+/**
+ * Live input masking helper: formats a numeric or partial string with thousand separators (commas).
+ * Examples:
+ * "1000000" -> "1,000,000"
+ * "12500.5" -> "12,500.5"
+ * "" -> ""
+ */
+export function formatNumberWithCommas(value: string | number | null | undefined): string {
+  if (value === '' || value === null || value === undefined) return '';
+  const str = String(value).trim();
+  const clean = str.replace(/[^0-9.]/g, '');
+  if (!clean) return '';
+
+  const parts = clean.split('.');
+  let integerPart = parts[0].replace(/^0+(?=\d)/, '');
+  if (integerPart === '') integerPart = '0';
+  
+  const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  
+  if (parts.length > 1) {
+    return `${formattedInteger}.${parts[1].slice(0, 2)}`;
+  }
+  return formattedInteger;
+}
+
+/**
+ * Strips commas and parses string into a valid number
+ */
+export function parseFormattedNumber(val: string | number | null | undefined): number {
+  if (val === '' || val === null || val === undefined) return 0;
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  const num = parseFloat(String(val).replace(/,/g, ''));
+  return isNaN(num) ? 0 : num;
+}
+

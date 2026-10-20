@@ -1,7 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Calculator, HelpCircle, DollarSign, Calendar, AlertCircle, AlertTriangle } from 'lucide-react';
+import { 
+  X, 
+  Save, 
+  Calendar, 
+  AlertCircle, 
+  AlertTriangle 
+} from 'lucide-react';
 import { Category, Asset, MonthlyRecord, RiskLevel } from '../types';
-import { formatCurrency, getRiskLevelBadgeClass } from '../lib/formatters';
+import { 
+  formatCurrency, 
+  formatPercent, 
+  getRiskLevelBadgeClass 
+} from '../lib/formatters';
 
 interface MonthEditorModalProps {
   isOpen: boolean;
@@ -97,8 +107,6 @@ export const MonthEditorModal: React.FC<MonthEditorModalProps> = ({
     }
   }, [isOpen, initialRecord, latestRecord]);
 
-  if (!isOpen) return null;
-
   const previewTotalAsset = (Object.values(assetValues) as number[]).reduce((acc, curr) => acc + (Number(curr) || 0), 0);
   const calculatedMonthlyInvested = (Object.values(assetInvestedValues) as number[]).reduce((acc, curr) => acc + (Number(curr) || 0), 0);
 
@@ -185,6 +193,8 @@ export const MonthEditorModal: React.FC<MonthEditorModalProps> = ({
 
     executeSave();
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
@@ -339,9 +349,7 @@ export const MonthEditorModal: React.FC<MonthEditorModalProps> = ({
                       </div>
 
                       <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="block text-[10px] text-slate-400 font-medium">Money Invested</label>
-                        </div>
+                        <label className="block text-[10px] text-slate-400 mb-1 font-medium">Money Invested</label>
                         <div className="relative">
                           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 font-mono text-[10px]">
                             {currencySymbol}

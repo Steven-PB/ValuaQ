@@ -189,7 +189,11 @@ export function mergeCategories(
     } else if (c && d) {
       const cTime = c.updatedAt ? new Date(c.updatedAt).getTime() : 0;
       const dTime = d.updatedAt ? new Date(d.updatedAt).getTime() : 0;
-      result.push(dTime > cTime ? d : c);
+      const winner = { ...(dTime > cTime ? d : c) };
+      if (winner.targetPercent === undefined && (d.targetPercent !== undefined || c.targetPercent !== undefined)) {
+        winner.targetPercent = d.targetPercent !== undefined ? d.targetPercent : c.targetPercent;
+      }
+      result.push(winner);
     }
   }
 

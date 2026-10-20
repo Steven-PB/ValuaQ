@@ -13,14 +13,15 @@ import {
   CloudCheck,
   LogOut,
   User as UserIcon,
-  RefreshCw
+  RefreshCw,
+  Scale
 } from 'lucide-react';
 import { AppSettings } from '../types';
 import { User } from '../lib/firebase';
 
 interface HeaderProps {
-  activeTab: 'dashboard' | 'spreadsheet' | 'hierarchy';
-  setActiveTab: (tab: 'dashboard' | 'spreadsheet' | 'hierarchy') => void;
+  activeTab: 'dashboard' | 'spreadsheet' | 'hierarchy' | 'rebalance';
+  setActiveTab: (tab: 'dashboard' | 'spreadsheet' | 'hierarchy' | 'rebalance') => void;
   settings: AppSettings;
   onUpdateSettings: (newSettings: Partial<AppSettings>) => void;
   onOpenDataModal: () => void;
@@ -229,6 +230,18 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             <span>Assets & Risk Hierarchy</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('rebalance')}
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-medium text-xs sm:text-sm transition-all whitespace-nowrap ${
+              activeTab === 'rebalance'
+                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-semibold'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <Scale className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span>Rebalance</span>
           </button>
         </div>
       </div>

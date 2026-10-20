@@ -7,6 +7,7 @@ export interface Category {
   color: string; // Hex color for chart rendering
   description?: string;
   updatedAt?: string;
+  targetPercent?: number; // Desired target portfolio allocation % (0 - 100)
 }
 
 export interface Asset {
@@ -48,3 +49,34 @@ export interface AppSettings {
   defaultChartType: ChartType;
   defaultGroupMode: ChartGroupMode;
 }
+
+export type RebalanceMode = 'cashflow' | 'full';
+
+export interface CategoryRebalanceItem {
+  categoryId: string;
+  categoryName: string;
+  categoryColor: string;
+  riskLevel: RiskLevel;
+  currentValue: number;
+  actualPercent: number;
+  targetPercent: number;
+  targetValue: number;
+  driftPercent: number; // actualPercent - targetPercent
+  status: 'underweight' | 'balanced' | 'overweight';
+  // Calculated action based on chosen mode and deposit
+  actionAmount: number; // positive = buy/deposit, negative = sell/trim
+  projectedValue: number;
+  projectedPercent: number;
+}
+
+export interface RebalanceAnalysis {
+  items: CategoryRebalanceItem[];
+  totalCurrentValue: number;
+  totalTargetPercent: number;
+  isTargetValid: boolean; // whether target percentages sum to 100%
+  overallDriftScore: number; // average absolute drift percentage across categories
+  depositAmount: number;
+  mode: RebalanceMode;
+  totalNewPortfolioValue: number;
+}
+

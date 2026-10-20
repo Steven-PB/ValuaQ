@@ -376,6 +376,7 @@ export function generateExcelWorkbook(
       hierarchyRows.push({
         'Category Name': cat.name,
         'Risk Level': cat.riskLevel,
+        'Target Allocation %': cat.targetPercent ?? 0,
         'Color': cat.color,
         'Asset Name': '',
         'Currency': '',
@@ -386,6 +387,7 @@ export function generateExcelWorkbook(
         hierarchyRows.push({
           'Category Name': cat.name,
           'Risk Level': cat.riskLevel,
+          'Target Allocation %': cat.targetPercent ?? 0,
           'Color': cat.color,
           'Asset Name': ast.name,
           'Currency': ast.currency || 'NTD',

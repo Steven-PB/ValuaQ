@@ -35,6 +35,7 @@ import { MonthEditorModal } from './components/MonthEditorModal';
 import { HierarchyManager } from './components/HierarchyManager';
 import { DataManagementModal } from './components/DataManagementModal';
 import { LoginScreen } from './components/LoginScreen';
+import { RebalanceView } from './components/RebalanceView';
 
 export default function App() {
   // User Auth & Cloud Sync States
@@ -49,7 +50,7 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings>(loadSettings);
 
   // Navigation Tab State
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'spreadsheet' | 'hierarchy'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'spreadsheet' | 'hierarchy' | 'rebalance'>('dashboard');
   const [chartType, setChartType] = useState<ChartType>('all');
 
   // Filter State
@@ -746,6 +747,12 @@ export default function App() {
     triggerCloudUpload(nextCats, nextAssets, records, settings);
   };
 
+  const handleUpdateCategoryTargets = (updatedCategories: Category[]) => {
+    setCategories(updatedCategories);
+    saveCategories(updatedCategories);
+    triggerCloudUpload(updatedCategories, assets, records, settings);
+  };
+
   // Reset to Demo
   const handleResetDemoData = () => {
     resetToDemoData();
@@ -839,14 +846,16 @@ export default function App() {
         />
 
         {/* Global Asset & Category Filter Bar */}
-        <FilterBar
-          categories={categories}
-          assets={assets}
-          filters={filters}
-          onUpdateFilters={handleUpdateFilters}
-          onResetFilters={handleResetFilters}
-          isSummaryTab={activeTab === 'dashboard' && chartType === 'all'}
-        />
+        {(activeTab === 'dashboard' || activeTab === 'spreadsheet') && (
+          <FilterBar
+            categories={categories}
+            assets={assets}
+            filters={filters}
+            onUpdateFilters={handleUpdateFilters}
+            onResetFilters={handleResetFilters}
+            isSummaryTab={activeTab === 'dashboard' && chartType === 'all'}
+          />
+        )}
 
         {/* Active Tab View Rendering */}
         {activeTab === 'dashboard' && (
@@ -892,6 +901,17 @@ export default function App() {
             onEditAsset={handleEditAsset}
             onDeleteAsset={handleDeleteAsset}
             onReassignAssetAndDelete={handleReassignAssetAndDelete}
+          />
+        )}
+
+        {activeTab === 'rebalance' && (
+          <RebalanceView
+            categories={categories}
+            assets={assets}
+            records={records}
+            currencySymbol={settings.currencySymbol}
+            stealthMode={settings.stealthMode}
+            onUpdateCategoryTargets={handleUpdateCategoryTargets}
           />
         )}
 
