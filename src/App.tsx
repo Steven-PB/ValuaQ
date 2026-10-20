@@ -779,6 +779,25 @@ export default function App() {
     triggerCloudUpload(nextCats, nextAssets, nextRecords, nextSettings);
   };
 
+  const handleApplyImportedData = (
+    newCats: Category[],
+    newAssets: Asset[],
+    newRecords: MonthlyRecord[]
+  ) => {
+    saveCategories(newCats);
+    saveAssets(newAssets);
+    saveMonthlyRecords(newRecords);
+    setCategories(newCats);
+    setAssets(newAssets);
+    setRecords(newRecords);
+    setFilters((prev) => ({
+      ...prev,
+      categoryIds: newCats.map((c) => c.id),
+      assetIds: newAssets.map((a) => a.id),
+    }));
+    triggerCloudUpload(newCats, newAssets, newRecords, settings);
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-emerald-500 selection:text-slate-950">
       
@@ -855,6 +874,7 @@ export default function App() {
             onOpenMonthEditor={handleOpenMonthEditor}
             onDeleteRecord={handleDeleteRecord}
             onDuplicateRecord={handleDuplicateRecord}
+            onOpenDataModal={() => setIsDataModalOpen(true)}
           />
         )}
 
@@ -893,6 +913,11 @@ export default function App() {
       <DataManagementModal
         isOpen={isDataModalOpen}
         onClose={() => setIsDataModalOpen(false)}
+        categories={categories}
+        assets={assets}
+        records={records}
+        settings={settings}
+        onApplyImportedData={handleApplyImportedData}
         onRefreshData={handleRefreshData}
         onResetDemo={handleResetDemoData}
       />

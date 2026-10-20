@@ -9,10 +9,13 @@ import {
   TrendingUp, 
   TrendingDown, 
   Calendar,
-  HelpCircle 
+  HelpCircle,
+  Download,
+  Upload
 } from 'lucide-react';
 import { Category, Asset, MonthlyRecord } from '../types';
 import { formatCurrency, formatPercent, formatMonthName } from '../lib/formatters';
+import { downloadExcelFile, downloadCSVFile } from '../lib/excelExportImport';
 
 interface SpreadsheetViewProps {
   records: MonthlyRecord[];
@@ -24,6 +27,7 @@ interface SpreadsheetViewProps {
   onOpenMonthEditor: (recordToEdit?: MonthlyRecord) => void;
   onDeleteRecord: (id: string) => void;
   onDuplicateRecord: (record: MonthlyRecord) => void;
+  onOpenDataModal?: () => void;
 }
 
 export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
@@ -36,6 +40,7 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
   onOpenMonthEditor,
   onDeleteRecord,
   onDuplicateRecord,
+  onOpenDataModal,
 }) => {
   const [sortAsc, setSortAsc] = useState<boolean>(false); // default: latest month first
   const [selectedYear, setSelectedYear] = useState<string>('ALL');
@@ -110,11 +115,43 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
 
           <button
             onClick={() => setSortAsc(!sortAsc)}
-            className="flex items-center gap-1.5 text-xs text-slate-300 bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-xl border border-slate-700 transition-all font-medium"
+            className="flex items-center gap-1.5 text-xs text-slate-300 bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-xl border border-slate-700 transition-all font-medium cursor-pointer"
           >
             <ArrowUpDown className="w-3.5 h-3.5 text-emerald-400" />
             <span>Sort: {sortAsc ? 'Oldest First' : 'Newest First'}</span>
           </button>
+
+          {/* Quick Export / Import Options */}
+          <div className="flex items-center gap-1 bg-slate-800/90 p-0.5 rounded-xl border border-slate-700">
+            <button
+              onClick={() => downloadExcelFile(categories, assets, records, { currencySymbol, stealthMode, defaultChartType: 'all', defaultGroupMode: 'category' })}
+              className="flex items-center gap-1 text-[11px] font-medium text-slate-300 hover:text-white hover:bg-slate-700 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer"
+              title="Download Excel spreadsheet (.xlsx)"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Excel</span>
+            </button>
+
+            <button
+              onClick={() => downloadCSVFile(categories, assets, records)}
+              className="flex items-center gap-1 text-[11px] font-medium text-slate-300 hover:text-white hover:bg-slate-700 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer"
+              title="Download CSV spreadsheet (.csv)"
+            >
+              <Download className="w-3.5 h-3.5 text-teal-400" />
+              <span>CSV</span>
+            </button>
+
+            {onOpenDataModal && (
+              <button
+                onClick={onOpenDataModal}
+                className="flex items-center gap-1 text-[11px] font-medium text-slate-300 hover:text-white hover:bg-slate-700 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer"
+                title="Import Excel/CSV or manage backups"
+              >
+                <Upload className="w-3.5 h-3.5 text-blue-400" />
+                <span>Import</span>
+              </button>
+            )}
+          </div>
 
           <button
             onClick={() => onOpenMonthEditor()}

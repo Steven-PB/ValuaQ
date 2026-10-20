@@ -157,6 +157,16 @@ export interface BackupData {
   settings: AppSettings;
 }
 
+export interface LocalSnapshot {
+  id: string;
+  name: string;
+  timestamp: string;
+  recordCount: number;
+  assetCount: number;
+  categoryCount: number;
+  data: BackupData;
+}
+
 export function exportAllData(): string {
   const data: BackupData = {
     version: '1.0.0',
@@ -185,6 +195,82 @@ export function importAllData(jsonString: string): boolean {
   return false;
 }
 
+export function getLocalSnapshots(): LocalSnapshot[] {
+  try {
+    const raw = localStorage.getItem('asset_tracker_local_snapshots_v1');
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.error('Failed to load local snapshots', e);
+  }
+  return [];
+}
+
+export function createLocalSnapshot(customName?: string): LocalSnapshot {
+  const currentCategories = loadCategories();
+  const currentAssets = loadAssets();
+  const currentRecords = loadMonthlyRecords();
+  const currentSettings = loadSettings();
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  const timeStr = now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  const defaultName = `Local Backup - ${dateStr} ${timeStr}`;
+
+  const snapshot: LocalSnapshot = {
+    id: `snap-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    name: customName || defaultName,
+    timestamp: now.toISOString(),
+    recordCount: currentRecords.length,
+    assetCount: currentAssets.length,
+    categoryCount: currentCategories.length,
+    data: {
+      version: '1.0.0',
+      timestamp: now.toISOString(),
+      categories: currentCategories,
+      assets: currentAssets,
+      records: currentRecords,
+      settings: currentSettings,
+    },
+  };
+
+  const existing = getLocalSnapshots();
+  // Keep up to 25 latest snapshots
+  const updated = [snapshot, ...existing].slice(0, 25);
+  try {
+    localStorage.setItem('asset_tracker_local_snapshots_v1', JSON.stringify(updated));
+  } catch (e) {
+    console.error('Failed to save local snapshot', e);
+  }
+  return snapshot;
+}
+
+export function restoreLocalSnapshot(id: string): boolean {
+  const snapshots = getLocalSnapshots();
+  const target = snapshots.find((s) => s.id === id);
+  if (!target || !target.data) return false;
+
+  try {
+    saveCategories(target.data.categories);
+    saveAssets(target.data.assets);
+    saveMonthlyRecords(target.data.records);
+    if (target.data.settings) saveSettings(target.data.settings);
+    return true;
+  } catch (e) {
+    console.error('Failed to restore local snapshot', e);
+    return false;
+  }
+}
+
+export function deleteLocalSnapshot(id: string): void {
+  const snapshots = getLocalSnapshots();
+  const updated = snapshots.filter((s) => s.id !== id);
+  try {
+    localStorage.setItem('asset_tracker_local_snapshots_v1', JSON.stringify(updated));
+  } catch (e) {
+    console.error('Failed to delete local snapshot', e);
+  }
+}
+
 export function resetToDemoData(): void {
   try {
     localStorage.removeItem(STORAGE_KEYS.CATEGORIES);
@@ -199,3 +285,4 @@ export function resetToDemoData(): void {
   saveMonthlyRecords(initialMonthlyRecords);
   saveSettings(initialSettings);
 }
+
