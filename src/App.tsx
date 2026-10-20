@@ -5,8 +5,15 @@ import {
   loadAssets, saveAssets, 
   loadMonthlyRecords, saveMonthlyRecords, recalculateMonthlyRecords,
   loadSettings, saveSettings, 
-  resetToDemoData 
+  resetToDemoData,
+  loadDeletedMonths, saveDeletedMonths, addDeletedMonth, removeDeletedMonth 
 } from './lib/storage';
+import { 
+  mergeMonthlyRecords, 
+  mergeCategories, 
+  mergeAssets, 
+  mergeSettings 
+} from './lib/syncMerge';
 import { Category, Asset, MonthlyRecord, AppSettings, FilterState, RiskLevel, ChartType } from './types';
 import { 
   auth, 
@@ -15,6 +22,7 @@ import {
   onAuthStateChanged, 
   syncDataToCloud, 
   fetchUserCloudData, 
+  subscribeToUserData,
   User 
 } from './lib/firebase';
 
@@ -69,30 +77,71 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Fetch Cloud Data once upon connection (overwrite local data immediately after login)
+  // Fetch Cloud Data upon connection with Set Union Guard:
+  // (Sync Data + Data on Device - (Sync Data ∩ Data on Device))
+  // Plus real-time subscription so updates from Device A propagate immediately to Device B!
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setIsCloudLoaded(false);
+      return;
+    }
 
     setIsSyncing(true);
+
+    // Initial union merge
     fetchUserCloudData(user.uid)
-      .then((cloudData) => {
-        if (cloudData && (cloudData.categories.length > 0 || cloudData.records.length > 0 || cloudData.assets.length > 0)) {
-          // Overwrite local data with the cloud data right after connecting
-          setCategories(cloudData.categories);
-          setAssets(cloudData.assets);
-          setRecords(cloudData.records);
-          setSettings(cloudData.settings);
-          saveCategories(cloudData.categories);
-          saveAssets(cloudData.assets);
-          saveMonthlyRecords(cloudData.records);
-          saveSettings(cloudData.settings);
+      .then(async (cloudData) => {
+        const localDeletedMonths = loadDeletedMonths();
+
+        if (cloudData) {
+          const finalDeletedMonths = Array.from(
+            new Set([...(cloudData.deletedRecordMonths || []), ...localDeletedMonths])
+          );
+          saveDeletedMonths(finalDeletedMonths);
+
+          const currentLocalRecords = loadMonthlyRecords();
+          const currentLocalCats = loadCategories();
+          const currentLocalAssets = loadAssets();
+          const currentLocalSettings = loadSettings();
+
+          // Set Union Guard: (Sync Data + Data on Device - (Sync Data ∩ Data on Device))
+          const recordMerge = mergeMonthlyRecords(
+            cloudData.records,
+            currentLocalRecords,
+            finalDeletedMonths
+          );
+          const finalCats = mergeCategories(cloudData.categories, currentLocalCats);
+          const finalAssets = mergeAssets(cloudData.assets, currentLocalAssets);
+          const finalSettings = mergeSettings(cloudData.settings, currentLocalSettings);
+
+          setCategories(finalCats);
+          setAssets(finalAssets);
+          setRecords(recordMerge.merged);
+          setSettings(finalSettings);
+
+          saveCategories(finalCats);
+          saveAssets(finalAssets);
+          saveMonthlyRecords(recordMerge.merged);
+          saveSettings(finalSettings);
+
+          // If Device has local months or updates not yet in Cloud, save the merged union to Cloud
+          if (recordMerge.hasChangesFromDevice) {
+            await syncDataToCloud(user.uid, {
+              categories: finalCats,
+              assets: finalAssets,
+              records: recordMerge.merged,
+              settings: finalSettings,
+              deletedRecordMonths: finalDeletedMonths,
+            });
+          }
         } else if (!isCloudLoaded) {
-          // Initialize empty cloud database with current default local data
-          syncDataToCloud(user.uid, {
+          // Initialize empty cloud database with current local data
+          await syncDataToCloud(user.uid, {
             categories,
             assets,
             records,
             settings,
+            deletedRecordMonths: localDeletedMonths,
           });
         }
         setIsCloudLoaded(true);
@@ -103,9 +152,83 @@ export default function App() {
       .finally(() => {
         setIsSyncing(false);
       });
+
+    // Real-time Firestore Subscription:
+    // If Device A adds a month, Device B receives it and merges in real-time!
+    const unsubscribeSnapshot = subscribeToUserData(
+      user.uid,
+      (cloudData) => {
+        if (!cloudData) return;
+        const localDeletedMonths = loadDeletedMonths();
+        const finalDeletedMonths = Array.from(
+          new Set([...(cloudData.deletedRecordMonths || []), ...localDeletedMonths])
+        );
+
+        setRecords((prevDeviceRecords) => {
+          const recordMerge = mergeMonthlyRecords(
+            cloudData.records,
+            prevDeviceRecords,
+            finalDeletedMonths
+          );
+          if (recordMerge.hasChangesFromCloud) {
+            saveMonthlyRecords(recordMerge.merged);
+            return recordMerge.merged;
+          }
+          return prevDeviceRecords;
+        });
+
+        setCategories((prevDeviceCats) => {
+          const finalCats = mergeCategories(cloudData.categories, prevDeviceCats);
+          saveCategories(finalCats);
+          return finalCats;
+        });
+
+        setAssets((prevDeviceAssets) => {
+          const finalAssets = mergeAssets(cloudData.assets, prevDeviceAssets);
+          saveAssets(finalAssets);
+          return finalAssets;
+        });
+      },
+      (err) => console.error("Firestore real-time subscription error:", err)
+    );
+
+    return () => {
+      unsubscribeSnapshot();
+    };
   }, [user]);
 
-  // Save changes to localStorage only (no automatic two-way or lagging cloud upload loop)
+  // Window Focus / Tab Visibility listener to catch up if Device B was in background
+  useEffect(() => {
+    if (!user) return;
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        fetchUserCloudData(user.uid).then((cloudData) => {
+          if (!cloudData) return;
+          const localDeletedMonths = loadDeletedMonths();
+          const finalDeletedMonths = Array.from(
+            new Set([...(cloudData.deletedRecordMonths || []), ...localDeletedMonths])
+          );
+          setRecords((prev) => {
+            const res = mergeMonthlyRecords(cloudData.records, prev, finalDeletedMonths);
+            if (res.hasChangesFromCloud) {
+              saveMonthlyRecords(res.merged);
+              return res.merged;
+            }
+            return prev;
+          });
+        });
+      }
+    };
+
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    return () => {
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+    };
+  }, [user]);
+
+  // Save changes to localStorage
   useEffect(() => {
     saveCategories(categories);
   }, [categories]);
@@ -122,8 +245,8 @@ export default function App() {
     saveSettings(settings);
   }, [settings]);
 
-  // Only upload local data when buttons that modify data are pressed
-  const triggerCloudUpload = (
+  // Cloud Upload with Union Guard: Reads cloud first and merges (Cloud + Device - (Cloud ∩ Device))
+  const triggerCloudUpload = async (
     nextCategories: Category[] = categories,
     nextAssets: Asset[] = assets,
     nextRecords: MonthlyRecord[] = records,
@@ -131,12 +254,84 @@ export default function App() {
   ) => {
     if (!user) return;
     setIsSyncing(true);
-    syncDataToCloud(user.uid, {
-      categories: nextCategories,
-      assets: nextAssets,
-      records: nextRecords,
-      settings: nextSettings,
-    }).finally(() => setIsSyncing(false));
+    try {
+      const deletedMonths = loadDeletedMonths();
+      const syncResult = await syncDataToCloud(user.uid, {
+        categories: nextCategories,
+        assets: nextAssets,
+        records: nextRecords,
+        settings: nextSettings,
+        deletedRecordMonths: deletedMonths,
+      });
+
+      if (syncResult) {
+        setCategories(syncResult.categories);
+        setAssets(syncResult.assets);
+        setRecords(syncResult.records);
+        setSettings(syncResult.settings);
+        saveCategories(syncResult.categories);
+        saveAssets(syncResult.assets);
+        saveMonthlyRecords(syncResult.records);
+        saveSettings(syncResult.settings);
+        saveDeletedMonths(syncResult.deletedRecordMonths);
+      }
+    } catch (err) {
+      console.error("Cloud upload/sync error:", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Manual Sync trigger for user
+  const handleManualSync = async () => {
+    if (!user) return;
+    setIsSyncing(true);
+    try {
+      const cloudData = await fetchUserCloudData(user.uid);
+      const localDeletedMonths = loadDeletedMonths();
+      if (cloudData) {
+        const finalDeletedMonths = Array.from(
+          new Set([...(cloudData.deletedRecordMonths || []), ...localDeletedMonths])
+        );
+        saveDeletedMonths(finalDeletedMonths);
+
+        const currentLocalRecords = loadMonthlyRecords();
+        const currentLocalCats = loadCategories();
+        const currentLocalAssets = loadAssets();
+        const currentLocalSettings = loadSettings();
+
+        const recordMerge = mergeMonthlyRecords(
+          cloudData.records,
+          currentLocalRecords,
+          finalDeletedMonths
+        );
+        const finalCats = mergeCategories(cloudData.categories, currentLocalCats);
+        const finalAssets = mergeAssets(cloudData.assets, currentLocalAssets);
+        const finalSettings = mergeSettings(cloudData.settings, currentLocalSettings);
+
+        setCategories(finalCats);
+        setAssets(finalAssets);
+        setRecords(recordMerge.merged);
+        setSettings(finalSettings);
+
+        saveCategories(finalCats);
+        saveAssets(finalAssets);
+        saveMonthlyRecords(recordMerge.merged);
+        saveSettings(finalSettings);
+
+        await syncDataToCloud(user.uid, {
+          categories: finalCats,
+          assets: finalAssets,
+          records: recordMerge.merged,
+          settings: finalSettings,
+          deletedRecordMonths: finalDeletedMonths,
+        });
+      }
+    } catch (err) {
+      console.error("Manual sync error:", err);
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleSignIn = async () => {
@@ -355,17 +550,23 @@ export default function App() {
     data: Omit<MonthlyRecord, 'id'>,
     existingId?: string
   ) => {
+    const nowIso = new Date().toISOString();
+    removeDeletedMonth(data.month);
     let nextRecords = [...records];
     if (existingId) {
-      nextRecords = nextRecords.map((r) => (r.id === existingId ? { ...r, ...data } : r));
+      nextRecords = nextRecords.map((r) =>
+        r.id === existingId ? { ...r, ...data, updatedAt: nowIso } : r
+      );
     } else {
       const newRecord: MonthlyRecord = {
         ...data,
         id: `rec-${data.month}-${Date.now()}`,
+        createdAt: nowIso,
+        updatedAt: nowIso,
       };
       const existsIndex = nextRecords.findIndex((r) => r.month === data.month);
       if (existsIndex >= 0) {
-        nextRecords[existsIndex] = { ...nextRecords[existsIndex], ...data };
+        nextRecords[existsIndex] = { ...nextRecords[existsIndex], ...data, updatedAt: nowIso };
       } else {
         nextRecords = [...nextRecords, newRecord];
       }
@@ -383,6 +584,10 @@ export default function App() {
 
   const confirmDeleteRecord = () => {
     if (deletingRecordId) {
+      const rec = records.find((r) => r.id === deletingRecordId);
+      if (rec) {
+        addDeletedMonth(rec.month);
+      }
       const recalculated = recalculateMonthlyRecords(records.filter((r) => r.id !== deletingRecordId));
       setRecords(recalculated);
       setDeletingRecordId(null);
@@ -402,6 +607,8 @@ export default function App() {
       yrNum += 1;
     }
     const nextMonth = `${yrNum}-${String(moNum).padStart(2, '0')}`;
+    removeDeletedMonth(nextMonth);
+    const nowIso = new Date().toISOString();
 
     const duplicatedInvested = { ...(rec.assetInvestedValues || {}) };
 
@@ -414,6 +621,8 @@ export default function App() {
       totalMoneyInvested: 0,
       emergencyFund: rec.emergencyFund || 0,
       description: `Duplicated from ${rec.month}`,
+      createdAt: nowIso,
+      updatedAt: nowIso,
     };
 
     const uniqueMap = new Map<string, MonthlyRecord>();
@@ -426,14 +635,16 @@ export default function App() {
 
   // Category CRUD
   const handleAddCategory = (newCat: Omit<Category, 'id'>) => {
-    const catObj: Category = { ...newCat, id: `cat-${Date.now()}` };
+    const catObj: Category = { ...newCat, id: `cat-${Date.now()}`, updatedAt: new Date().toISOString() };
     const nextCats = [...categories, catObj];
     setCategories(nextCats);
     triggerCloudUpload(nextCats, assets, records, settings);
   };
 
   const handleEditCategory = (id: string, updated: Partial<Category>) => {
-    const nextCats = categories.map((c) => (c.id === id ? { ...c, ...updated } : c));
+    const nextCats = categories.map((c) =>
+      c.id === id ? { ...c, ...updated, updatedAt: new Date().toISOString() } : c
+    );
     setCategories(nextCats);
     triggerCloudUpload(nextCats, assets, records, settings);
   };
@@ -469,14 +680,16 @@ export default function App() {
 
   // Asset CRUD
   const handleAddAsset = (newAst: Omit<Asset, 'id'>) => {
-    const astObj: Asset = { ...newAst, id: `ast-${Date.now()}` };
+    const astObj: Asset = { ...newAst, id: `ast-${Date.now()}`, updatedAt: new Date().toISOString() };
     const nextAssets = [...assets, astObj];
     setAssets(nextAssets);
     triggerCloudUpload(categories, nextAssets, records, settings);
   };
 
   const handleEditAsset = (id: string, updated: Partial<Asset>) => {
-    const nextAssets = assets.map((a) => (a.id === id ? { ...a, ...updated } : a));
+    const nextAssets = assets.map((a) =>
+      a.id === id ? { ...a, ...updated, updatedAt: new Date().toISOString() } : a
+    );
     setAssets(nextAssets);
     triggerCloudUpload(categories, nextAssets, records, settings);
   };
@@ -536,6 +749,7 @@ export default function App() {
   // Reset to Demo
   const handleResetDemoData = () => {
     resetToDemoData();
+    saveDeletedMonths([]);
     const nextCats = loadCategories();
     const nextAssets = loadAssets();
     const nextRecords = loadMonthlyRecords();
@@ -583,6 +797,7 @@ export default function App() {
         onSignIn={handleSignIn}
         onSignOut={handleSignOut}
         isSyncing={isSyncing}
+        onManualSync={handleManualSync}
       />
 
       {/* Main Container */}
@@ -611,7 +826,7 @@ export default function App() {
           filters={filters}
           onUpdateFilters={handleUpdateFilters}
           onResetFilters={handleResetFilters}
-          isSummaryTab={activeTab === 'dashboard'}
+          isSummaryTab={activeTab === 'dashboard' && chartType === 'all'}
         />
 
         {/* Active Tab View Rendering */}

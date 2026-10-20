@@ -12,7 +12,8 @@ import {
   Cloud,
   CloudCheck,
   LogOut,
-  User as UserIcon
+  User as UserIcon,
+  RefreshCw
 } from 'lucide-react';
 import { AppSettings } from '../types';
 import { User } from '../lib/firebase';
@@ -31,6 +32,7 @@ interface HeaderProps {
   onSignIn: () => void;
   onSignOut: () => void;
   isSyncing?: boolean;
+  onManualSync?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -44,6 +46,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSignIn,
   onSignOut,
   isSyncing,
+  onManualSync,
 }) => {
   return (
     <header className="bg-slate-900 border-b border-slate-800 text-slate-100 sticky top-0 z-30 shadow-md">
@@ -108,6 +111,16 @@ export const Header: React.FC<HeaderProps> = ({
                     <Cloud className="w-2 h-2 sm:w-2.5 sm:h-2.5" /> {isSyncing ? 'Syncing...' : 'Synced'}
                   </span>
                 </div>
+                {onManualSync && (
+                  <button
+                    onClick={onManualSync}
+                    disabled={isSyncing}
+                    className="p-1 text-slate-400 hover:text-emerald-400 rounded-md hover:bg-slate-700/50 transition-all cursor-pointer ml-0.5 disabled:opacity-50"
+                    title="Sync Now: Merge cloud and device data safely (Union Guard)"
+                  >
+                    <RefreshCw className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${isSyncing ? 'animate-spin text-emerald-400' : ''}`} />
+                  </button>
+                )}
                 <button
                   onClick={onSignOut}
                   className="p-1 text-slate-400 hover:text-rose-400 rounded-md hover:bg-slate-700/50 transition-all cursor-pointer ml-0.5"

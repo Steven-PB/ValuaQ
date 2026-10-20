@@ -69,7 +69,8 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
   const [internalChartType, setInternalChartType] = useState<ChartType>('all');
   const chartType = externalChartType ?? internalChartType;
 
-  const showEmergencyFund = filters?.includeEmergencyFund !== false;
+  const isSummaryTab = chartType === 'all';
+  const showEmergencyFund = isSummaryTab && filters?.includeEmergencyFund !== false;
 
   const handleSetChartType = (type: ChartType) => {
     setInternalChartType(type);

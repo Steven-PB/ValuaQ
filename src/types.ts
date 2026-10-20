@@ -6,6 +6,7 @@ export interface Category {
   riskLevel: RiskLevel;
   color: string; // Hex color for chart rendering
   description?: string;
+  updatedAt?: string;
 }
 
 export interface Asset {
@@ -14,6 +15,7 @@ export interface Asset {
   categoryId: string;
   currency?: string; // e.g. "USD", "NTD"
   description?: string;
+  updatedAt?: string;
 }
 
 export interface MonthlyRecord {
@@ -26,6 +28,7 @@ export interface MonthlyRecord {
   emergencyFund?: number; // Optional safety net cash reserve (excluded from investment P&L and invested capital)
   description?: string;
   createdAt?: string;
+  updatedAt?: string;
 }
 
 export type ChartGroupMode = 'asset' | 'category' | 'risk';

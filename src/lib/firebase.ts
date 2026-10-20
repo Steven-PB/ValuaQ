@@ -17,6 +17,7 @@ import {
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { Category, Asset, MonthlyRecord, AppSettings } from '../types';
+import { mergeMonthlyRecords, mergeCategories, mergeAssets, mergeSettings } from './syncMerge';
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
@@ -51,27 +52,121 @@ export interface UserCloudData {
   assets: Asset[];
   records: MonthlyRecord[];
   settings: AppSettings;
+  deletedRecordMonths?: string[];
   updatedAt?: any;
+}
+
+/**
+ * Recursively removes all keys with `undefined` values from objects and arrays.
+ * This is required because Firestore throws:
+ * "Unsupported field value: undefined" if any field or nested field in an object or array has the value `undefined`.
+ */
+export function deepCleanFirestoreData<T>(obj: T): T {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  // Preserve Firestore Sentinels (serverTimestamp, FieldValue, etc.)
+  if (typeof obj === 'object' && obj !== null && (obj as any)._methodName !== undefined) {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj
+      .filter((item) => item !== undefined)
+      .map((item) => deepCleanFirestoreData(item)) as unknown as T;
+  }
+
+  if (typeof obj === 'object') {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = deepCleanFirestoreData(value);
+      }
+    }
+    return cleaned as unknown as T;
+  }
+
+  return obj;
 }
 
 export const syncDataToCloud = async (
   userId: string,
-  data: {
+  localData: {
     categories: Category[];
     assets: Asset[];
     records: MonthlyRecord[];
     settings: AppSettings;
+    deletedRecordMonths?: string[];
   }
-) => {
-  if (!userId) return;
+): Promise<{
+  categories: Category[];
+  assets: Asset[];
+  records: MonthlyRecord[];
+  settings: AppSettings;
+  deletedRecordMonths: string[];
+} | null> => {
+  if (!userId) return null;
   const userRef = doc(db, 'users', userId);
-  await setDoc(userRef, {
-    categories: data.categories,
-    assets: data.assets,
-    monthlyRecords: data.records,
-    settings: data.settings,
-    updatedAt: serverTimestamp(),
-  }, { merge: true });
+
+  try {
+    const snapshot = await getDoc(userRef);
+    let finalCategories = localData.categories || [];
+    let finalAssets = localData.assets || [];
+    let finalRecords = localData.records || [];
+    let finalSettings = localData.settings;
+    let finalDeletedMonths = localData.deletedRecordMonths || [];
+
+    if (snapshot.exists()) {
+      const cloudData = snapshot.data();
+      const cloudRecords: MonthlyRecord[] = cloudData.monthlyRecords || [];
+      const cloudCategories: Category[] = cloudData.categories || [];
+      const cloudAssets: Asset[] = cloudData.assets || [];
+      const cloudSettings: AppSettings = cloudData.settings;
+      const cloudDeletedMonths: string[] = cloudData.deletedRecordMonths || [];
+
+      // Union of tombstoned deleted months
+      finalDeletedMonths = Array.from(new Set([...cloudDeletedMonths, ...finalDeletedMonths]));
+
+      // Union Guard: (Sync Data + Data on Device - (Sync Data ∩ Data on Device))
+      const recordMerge = mergeMonthlyRecords(cloudRecords, localData.records, finalDeletedMonths);
+      finalRecords = recordMerge.merged;
+      finalCategories = mergeCategories(cloudCategories, localData.categories);
+      finalAssets = mergeAssets(cloudAssets, localData.assets);
+      finalSettings = mergeSettings(cloudSettings, localData.settings);
+    }
+
+    const cleanedCategories = deepCleanFirestoreData(finalCategories);
+    const cleanedAssets = deepCleanFirestoreData(finalAssets);
+    const cleanedRecords = deepCleanFirestoreData(finalRecords);
+    const cleanedSettings = deepCleanFirestoreData(finalSettings || {
+      currencySymbol: 'NT$',
+      stealthMode: false,
+      defaultChartType: 'all',
+      defaultGroupMode: 'category',
+    });
+    const cleanedDeletedMonths = deepCleanFirestoreData(finalDeletedMonths);
+
+    await setDoc(userRef, {
+      categories: cleanedCategories,
+      assets: cleanedAssets,
+      monthlyRecords: cleanedRecords,
+      settings: cleanedSettings,
+      deletedRecordMonths: cleanedDeletedMonths,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+
+    return {
+      categories: finalCategories,
+      assets: finalAssets,
+      records: finalRecords,
+      settings: finalSettings,
+      deletedRecordMonths: finalDeletedMonths,
+    };
+  } catch (error) {
+    console.error("Error in syncDataToCloud:", error);
+    throw error;
+  }
 };
 
 export const fetchUserCloudData = async (
@@ -92,6 +187,7 @@ export const fetchUserCloudData = async (
         defaultChartType: 'all',
         defaultGroupMode: 'category'
       },
+      deletedRecordMonths: data.deletedRecordMonths || [],
       updatedAt: data.updatedAt
     };
   }
@@ -117,6 +213,7 @@ export const subscribeToUserData = (
           defaultChartType: 'all',
           defaultGroupMode: 'category'
         },
+        deletedRecordMonths: data.deletedRecordMonths || [],
         updatedAt: data.updatedAt
       });
     } else {
@@ -129,7 +226,8 @@ export const subscribeToUserData = (
           stealthMode: false,
           defaultChartType: 'all',
           defaultGroupMode: 'category'
-        }
+        },
+        deletedRecordMonths: [],
       });
     }
   }, (err) => {

@@ -6,7 +6,38 @@ const STORAGE_KEYS = {
   ASSETS: 'asset_tracker_assets_v3',
   RECORDS: 'asset_tracker_records_v3',
   SETTINGS: 'asset_tracker_settings_v3',
+  DELETED_MONTHS: 'asset_tracker_deleted_months_v3',
 };
+
+export function loadDeletedMonths(): string[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.DELETED_MONTHS);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.error('Failed to load deleted months from storage', e);
+  }
+  return [];
+}
+
+export function saveDeletedMonths(months: string[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.DELETED_MONTHS, JSON.stringify(Array.from(new Set(months))));
+  } catch (e) {
+    console.error('Failed to save deleted months to storage', e);
+  }
+}
+
+export function addDeletedMonth(month: string): void {
+  const current = loadDeletedMonths();
+  if (!current.includes(month)) {
+    saveDeletedMonths([...current, month]);
+  }
+}
+
+export function removeDeletedMonth(month: string): void {
+  const current = loadDeletedMonths();
+  saveDeletedMonths(current.filter((m) => m !== month));
+}
 
 export function loadCategories(): Category[] {
   try {
