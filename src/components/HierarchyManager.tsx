@@ -474,14 +474,21 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
                 <label className="block text-slate-400 font-semibold mb-1">Target Portfolio Allocation % (Optional)</label>
                 <div className="relative">
                   <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="1"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
                     placeholder="e.g. 25"
-                    value={catTargetPercent || ''}
-                    onChange={(e) => setCatTargetPercent(parseFloat(e.target.value) || 0)}
-                    className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3 py-2 pr-8 text-xs font-mono font-bold focus:outline-none focus:border-emerald-500"
+                    value={catTargetPercent === 0 ? '' : String(catTargetPercent)}
+                    onChange={(e) => {
+                      const clean = e.target.value.replace(/[^0-9.]/g, '').replace(/^0+(?=\d)/, '');
+                      const num = parseFloat(clean);
+                      if (isNaN(num)) {
+                        setCatTargetPercent(0);
+                      } else {
+                        setCatTargetPercent(Math.min(100, num));
+                      }
+                    }}
+                    className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3 py-2 pr-8 text-xs font-mono font-bold focus:outline-none focus:border-emerald-500 tabular-nums"
                   />
                   <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-500 font-mono text-xs">
                     %

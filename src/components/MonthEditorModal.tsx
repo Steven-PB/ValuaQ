@@ -10,7 +10,9 @@ import { Category, Asset, MonthlyRecord, RiskLevel } from '../types';
 import { 
   formatCurrency, 
   formatPercent, 
-  getRiskLevelBadgeClass 
+  getRiskLevelBadgeClass,
+  formatNumberWithCommas,
+  parseFormattedNumber
 } from '../lib/formatters';
 
 interface MonthEditorModalProps {
@@ -92,15 +94,15 @@ export const MonthEditorModal: React.FC<MonthEditorModalProps> = ({
       setAssetValues(initialVals);
       setAssetInvestedValues(initialInvVals);
       setEmergencyFund(initialEF);
-      setEmergencyFundInput(initialEF === 0 ? '' : String(initialEF));
+      setEmergencyFundInput(initialEF === 0 ? '' : formatNumberWithCommas(initialEF));
 
       const valInputs: Record<string, string> = {};
       const invInputs: Record<string, string> = {};
       Object.entries(initialVals).forEach(([id, val]) => {
-        valInputs[id] = val === 0 ? '' : String(val);
+        valInputs[id] = val === 0 ? '' : formatNumberWithCommas(val);
       });
       Object.entries(initialInvVals).forEach(([id, val]) => {
-        invInputs[id] = val === 0 ? '' : String(val);
+        invInputs[id] = val === 0 ? '' : formatNumberWithCommas(val);
       });
       setAssetValueInputs(valInputs);
       setAssetInvestedValueInputs(invInputs);
@@ -128,9 +130,9 @@ export const MonthEditorModal: React.FC<MonthEditorModalProps> = ({
   const previewFloatingPL = previewTotalAsset - calculatedTotalInvested;
 
   const handleAssetValueChange = (assetId: string, valueStr: string) => {
-    const sanitized = valueStr.replace(/^0+(?=\d)/, '');
-    setAssetValueInputs((prev) => ({ ...prev, [assetId]: sanitized }));
-    const parsed = parseFloat(sanitized) || 0;
+    const formatted = formatNumberWithCommas(valueStr);
+    setAssetValueInputs((prev) => ({ ...prev, [assetId]: formatted }));
+    const parsed = parseFormattedNumber(formatted);
     setAssetValues((prev) => ({
       ...prev,
       [assetId]: parsed,
@@ -138,9 +140,9 @@ export const MonthEditorModal: React.FC<MonthEditorModalProps> = ({
   };
 
   const handleAssetInvestedValueChange = (assetId: string, valueStr: string) => {
-    const sanitized = valueStr.replace(/^0+(?=\d)/, '');
-    setAssetInvestedValueInputs((prev) => ({ ...prev, [assetId]: sanitized }));
-    const parsed = parseFloat(sanitized) || 0;
+    const formatted = formatNumberWithCommas(valueStr);
+    setAssetInvestedValueInputs((prev) => ({ ...prev, [assetId]: formatted }));
+    const parsed = parseFormattedNumber(formatted);
     setAssetInvestedValues((prev) => ({
       ...prev,
       [assetId]: parsed,
@@ -148,9 +150,9 @@ export const MonthEditorModal: React.FC<MonthEditorModalProps> = ({
   };
 
   const handleEmergencyFundChange = (valueStr: string) => {
-    const sanitized = valueStr.replace(/^0+(?=\d)/, '');
-    setEmergencyFundInput(sanitized);
-    const parsed = parseFloat(sanitized) || 0;
+    const formatted = formatNumberWithCommas(valueStr);
+    setEmergencyFundInput(formatted);
+    const parsed = parseFormattedNumber(formatted);
     setEmergencyFund(parsed);
   };
 
@@ -279,12 +281,12 @@ export const MonthEditorModal: React.FC<MonthEditorModalProps> = ({
                   {currencySymbol}
                 </span>
                 <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={emergencyFundInput ?? (emergencyFund === 0 ? '' : String(emergencyFund))}
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={emergencyFundInput}
                   onChange={(e) => handleEmergencyFundChange(e.target.value)}
-                  className="w-full bg-slate-900 border border-amber-500/30 text-amber-300 rounded-xl pl-8 pr-3 py-2 font-mono text-xs font-bold focus:outline-none focus:border-amber-400"
+                  className="w-full bg-slate-900 border border-amber-500/30 text-amber-300 rounded-xl pl-8 pr-3 py-2 font-mono text-xs font-bold focus:outline-none focus:border-amber-400 tabular-nums"
                   placeholder="0"
                 />
               </div>
@@ -337,12 +339,12 @@ export const MonthEditorModal: React.FC<MonthEditorModalProps> = ({
                             {currencySymbol}
                           </span>
                           <input
-                            type="number"
-                            min="0"
-                            step="any"
-                            value={assetValueInputs[ast.id] ?? (currentVal === 0 ? '' : String(currentVal))}
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="off"
+                            value={assetValueInputs[ast.id] ?? ''}
                             onChange={(e) => handleAssetValueChange(ast.id, e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-800 text-slate-100 rounded-lg pl-7 pr-2 py-1 font-mono text-xs focus:outline-none focus:border-emerald-500"
+                            className="w-full bg-slate-900 border border-slate-800 text-slate-100 rounded-lg pl-7 pr-2 py-1 font-mono text-xs focus:outline-none focus:border-emerald-500 tabular-nums"
                             placeholder="0"
                           />
                         </div>
@@ -355,12 +357,12 @@ export const MonthEditorModal: React.FC<MonthEditorModalProps> = ({
                             {currencySymbol}
                           </span>
                           <input
-                            type="number"
-                            min="0"
-                            step="any"
-                            value={assetInvestedValueInputs[ast.id] ?? (investedVal === 0 ? '' : String(investedVal))}
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="off"
+                            value={assetInvestedValueInputs[ast.id] ?? ''}
                             onChange={(e) => handleAssetInvestedValueChange(ast.id, e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-800 text-blue-300 rounded-lg pl-7 pr-2 py-1 font-mono text-xs focus:outline-none focus:border-blue-500"
+                            className="w-full bg-slate-900 border border-slate-800 text-blue-300 rounded-lg pl-7 pr-2 py-1 font-mono text-xs focus:outline-none focus:border-blue-500 tabular-nums"
                             placeholder="0"
                           />
                         </div>

@@ -128,7 +128,9 @@ export function formatNumberWithCommas(value: string | number | null | undefined
   const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   
   if (parts.length > 1) {
-    return `${formattedInteger}.${parts[1].slice(0, 2)}`;
+    // Keep decimal point and up to 4 decimal places
+    const decimals = parts.slice(1).join('').slice(0, 4);
+    return `${formattedInteger}.${decimals}`;
   }
   return formattedInteger;
 }
