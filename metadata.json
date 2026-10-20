@@ -1,0 +1,6 @@
+{
+  "name": "ValuaQ",
+  "description": "Track monthly assets, investments, profit/loss, and portfolio allocation with interactive pie & stacked bar charts across risk levels and custom categories.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
