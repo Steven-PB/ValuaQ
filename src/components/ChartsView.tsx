@@ -40,8 +40,13 @@ import {
   formatCurrency,
   formatCompactCurrency,
   formatMonthName,
+  formatNumberWithCommas,
+  formatPercent,
   getRiskLevelColor,
+  isLiveMonth,
 } from '../lib/formatters';
+import { isEmergencyFundAsset, getAssetBasePrice } from '../lib/ledgerEngine';
+import { CustomDropdown } from './CustomDropdown';
 
 interface ChartsViewProps {
   records: MonthlyRecord[];
@@ -222,11 +227,15 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
       const [yr, mo] = m.split('-');
       const date = new Date(parseInt(yr, 10), parseInt(mo, 10) - 1, 1);
       const monthName = date.toLocaleDateString('en-US', { month: 'short' });
+      const recObj = records.find((r) => r.month === m);
+      const isLive = Boolean(recObj?.isLivePending || isLiveMonth(m));
       return {
         fullMonth: m,
         monthNum: mo,
-        monthName,
-        label: `${mo} - ${monthName}`,
+        monthName: isLive ? 'Live' : monthName,
+        label: isLive ? 'Live' : `${mo} - ${monthName} (1st)`,
+        color: isLive ? '#10b981' : undefined,
+        badge: isLive ? 'LIVE' : undefined,
       };
     });
   }, [records, pieSelectedYear]);
@@ -300,9 +309,19 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
         .map((a) => {
           const val = rawValues[a.id] || 0;
           const cat = categoryMap.get(a.categoryId);
+          const unitPrice = getAssetBasePrice(a, activeMonthRecord.assetPrices);
+          const quantity = activeMonthRecord.assetQuantities?.[a.id] ?? 0;
+          const curr = (a.currency || 'NTD').toUpperCase();
+          const isBaseCash = Boolean(a.isCash && (curr === 'NTD' || curr === 'TWD'));
           return {
             id: a.id,
             name: a.name,
+            tickerSymbol: a.tickerSymbol,
+            currency: a.currency,
+            isCash: Boolean(a.isCash || cat?.isCashCategory),
+            isBaseCash,
+            unitPrice,
+            quantity,
             value: val,
             color: assetColors[a.id] || '#10b981',
             categoryName: cat?.name || 'Unassigned',
@@ -317,6 +336,12 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
           items.push({
             id: 'emergency-fund',
             name: 'Emergency Fund',
+            tickerSymbol: 'TWD',
+            currency: 'NTD',
+            isCash: true,
+            isBaseCash: true,
+            unitPrice: 1,
+            quantity: efVal,
             value: efVal,
             color: '#10b981',
             categoryName: 'Safety Net',
@@ -538,11 +563,11 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
           const rawInv = r.assetInvestedValues || {};
           let mInv = 0;
           assets
-            .filter((a) => activeAssetIds.includes(a.id))
+            .filter((a) => activeAssetIds.includes(a.id) && !isEmergencyFundAsset(a))
             .forEach((a) => {
               mInv += rawInv[a.id] || 0;
             });
-          if (activeAssetIds.length === assets.length && mInv === 0 && (r.monthlyMoneyInvested || 0) > 0) {
+          if (activeAssetIds.length === assets.length && mInv === 0 && (r.monthlyMoneyInvested || 0) !== 0) {
             mInv = r.monthlyMoneyInvested || 0;
           }
           filteredTotalInvested += mInv;
@@ -551,11 +576,13 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
       if (activeAssetIds.length === assets.length && filteredTotalInvested === 0 && (rec.totalMoneyInvested || 0) > 0) {
         filteredTotalInvested = rec.totalMoneyInvested || 0;
       }
+      filteredTotalInvested = Math.max(0, Math.round(filteredTotalInvested * 100) / 100);
 
       const rowData: Record<string, any> = {
         month: rec.month,
         monthLabel: label,
         isStub: false,
+        isLive: Boolean(rec.isLivePending),
         totalInvested: filteredTotalInvested,
       };
 
@@ -678,64 +705,63 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
   }, [selectedBarData, barChartData]);
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-md mb-8">
+    <div className="fintech-card rounded-xl p-4 sm:p-6 mb-8">
       
       {/* Visualizations Toolbar */}
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 border-b border-slate-800 pb-4 mb-6">
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 border-b border-slate-800/80 pb-4 mb-6">
         
         <div className="flex flex-wrap items-center gap-3">
           {/* Toggle between Summary (Both), Portfolio & Asset Growth */}
-          <div className="flex items-center space-x-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+          <div className="flex items-center gap-1 bg-[#080C14] p-1 rounded-lg border border-slate-800/90">
             <button
               onClick={() => handleSetChartType('all')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 chartType === 'all'
-                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  ? 'bg-emerald-500 text-slate-950'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
-              <Layers className="w-4 h-4" />
+              <Layers className="w-3.5 h-3.5" />
               <span>Summary</span>
             </button>
 
             <button
               onClick={() => handleSetChartType('pie')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 chartType === 'pie'
-                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  ? 'bg-emerald-500 text-slate-950'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
-              <PieChartIcon className="w-4 h-4" />
+              <PieChartIcon className="w-3.5 h-3.5" />
               <span>Portfolio</span>
             </button>
 
             <button
               onClick={() => handleSetChartType('stackedBar')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 chartType === 'stackedBar'
-                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  ? 'bg-emerald-500 text-slate-950'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
-              <BarChart3 className="w-4 h-4" />
+              <BarChart3 className="w-3.5 h-3.5" />
               <span>Asset Growth</span>
             </button>
           </div>
         </div>
 
         {/* Grouping Mode Switcher (Assets / Categories / Risk Level) */}
-        <div className="flex items-center space-x-2">
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider hidden sm:inline flex items-center gap-1">
-            <Layers className="w-3.5 h-3.5 text-emerald-400" />
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-slate-400 hidden sm:inline">
             Group By:
           </span>
-          <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
+          <div className="flex items-center gap-1 bg-[#080C14] p-1 rounded-lg border border-slate-800/90">
             <button
               onClick={() => setGroupMode('asset')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 groupMode === 'asset'
-                  ? 'bg-slate-800 text-emerald-400 font-semibold border border-slate-700'
+                  ? 'bg-slate-800/90 text-emerald-400 font-semibold border border-slate-700/80'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
@@ -743,9 +769,9 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
             </button>
             <button
               onClick={() => setGroupMode('category')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 groupMode === 'category'
-                  ? 'bg-slate-800 text-emerald-400 font-semibold border border-slate-700'
+                  ? 'bg-slate-800/90 text-emerald-400 font-semibold border border-slate-700/80'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
@@ -753,9 +779,9 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
             </button>
             <button
               onClick={() => setGroupMode('risk')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 groupMode === 'risk'
-                  ? 'bg-slate-800 text-emerald-400 font-semibold border border-slate-700'
+                  ? 'bg-slate-800/90 text-emerald-400 font-semibold border border-slate-700/80'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
@@ -767,53 +793,154 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
         {/* Sub-toolbar Controls: Shared Year & Month Selectors (Parent area above both Portfolio & Asset Growth) */}
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           {/* Shared Year Dropdown */}
-          <div className="flex items-center space-x-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs shadow-sm">
-            <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+          <div className="flex items-center space-x-1.5 text-xs">
             <span className="text-slate-400 font-medium">Year:</span>
-            <select
+            <CustomDropdown
               value={pieSelectedYear}
-              onChange={(e) => setPieSelectedYear(e.target.value)}
-              className="bg-transparent text-slate-200 font-semibold focus:outline-none cursor-pointer"
-            >
-              {pieAvailableYears.map((yr) => (
-                <option key={yr} value={yr} className="bg-slate-900 text-slate-200">
-                  {yr}
-                </option>
-              ))}
-            </select>
+              onChange={setPieSelectedYear}
+              options={pieAvailableYears.map((yr) => ({ value: yr, label: yr }))}
+              icon={<Calendar className="w-3.5 h-3.5 text-emerald-400" />}
+              className="w-28 text-xs"
+            />
           </div>
 
           {/* Shared Month Dropdown */}
-          <div className="flex items-center space-x-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs shadow-sm">
+          <div className="flex items-center space-x-1.5 text-xs">
             <span className="text-slate-400 font-medium">Month:</span>
-            <select
+            <CustomDropdown
               value={pieSelectedMonthNum}
-              onChange={(e) => setPieSelectedMonthNum(e.target.value)}
-              className="bg-transparent text-slate-200 font-semibold focus:outline-none cursor-pointer"
-            >
-              {pieAvailableMonths.map((m) => (
-                <option key={m.monthNum} value={m.monthNum} className="bg-slate-900 text-slate-200">
-                  {m.label}
-                </option>
-              ))}
-            </select>
+              onChange={setPieSelectedMonthNum}
+              options={pieAvailableMonths.map((m) => ({
+                value: m.monthNum,
+                label: m.label,
+                color: m.color,
+                badge: m.badge,
+              }))}
+              className="w-36 text-xs"
+            />
           </div>
         </div>
       </div>
 
+      {/* Asset Market Prices Strip (Shown when Assets tab/mode is selected or when specific categories/assets are selected) */}
+      {(groupMode === 'asset' ||
+        (filters &&
+          (filters.categoryIds.length < categories.length ||
+            filters.assetIds.length < assets.length))) &&
+        activeMonthRecord && (
+          <div className="mb-6 bg-[#080C14]/80 border border-slate-800/80 rounded-xl p-3.5">
+            <div className="flex items-center justify-between gap-2 mb-2.5">
+              <div className="flex items-center gap-2 text-xs">
+                <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="font-semibold text-slate-200">
+                  Asset Market Prices
+                </span>
+                <span className="text-slate-600" aria-hidden="true">·</span>
+                {activeMonthRecord.isLivePending || isLiveMonth(selectedMonth) ? (
+                  <span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-emerald-400 font-semibold">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                    </span>
+                    <span>Live</span>
+                  </span>
+                ) : (
+                  <span className="font-mono text-[11px] text-slate-400">
+                    {formatMonthName(selectedMonth)} (1st)
+                  </span>
+                )}
+              </div>
+              <span className="text-[11px] font-mono tabular-nums text-slate-500">
+                Unit Valuation in {currencySymbol}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+              {assets
+                .filter((a) => activeAssetIds.includes(a.id) && !isEmergencyFundAsset(a))
+                .map((ast) => {
+                  const cat = categoryMap.get(ast.categoryId);
+                  const price = getAssetBasePrice(ast, activeMonthRecord.assetPrices);
+                  const qty = activeMonthRecord.assetQuantities?.[ast.id] ?? 0;
+                  const curr = (ast.currency || 'NTD').toUpperCase();
+                  const isBaseCash = Boolean(ast.isCash && (curr === 'NTD' || curr === 'TWD'));
+
+                  // Compare against previous month price if available
+                  const curRecIdx = records.findIndex((r) => r.month === activeMonthRecord.month);
+                  const prevRec = curRecIdx > 0 ? records[curRecIdx - 1] : undefined;
+                  const prevPrice = prevRec
+                    ? getAssetBasePrice(ast, prevRec.assetPrices)
+                    : undefined;
+                  const priceDeltaPct =
+                    !isBaseCash && prevPrice && prevPrice > 0
+                      ? ((price - prevPrice) / prevPrice) * 100
+                      : 0;
+
+                  return (
+                    <div
+                      key={ast.id}
+                      className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-[#0D131F] border border-slate-800/80 hover:border-slate-700 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: cat?.color || '#10b981' }}
+                        />
+                        <div className="min-w-0">
+                          <div className="text-xs font-semibold text-slate-100 truncate flex items-center gap-1">
+                            <span className="truncate">{ast.name}</span>
+                            {ast.tickerSymbol && (
+                              <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                                ({ast.tickerSymbol})
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-slate-500 truncate font-mono tabular-nums">
+                            {cat?.name || 'Asset'} · Qty {stealthMode ? '•••' : formatNumberWithCommas(qty)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0 font-mono tabular-nums">
+                        <div className="text-xs font-bold text-emerald-400">
+                          {isBaseCash
+                            ? `${currencySymbol} 1 (Base)`
+                            : formatCurrency(price, currencySymbol, stealthMode)}
+                        </div>
+                        {!isBaseCash && Math.abs(priceDeltaPct) > 0.01 ? (
+                          <div
+                            className={`text-[10px] font-semibold ${
+                              priceDeltaPct >= 0 ? 'text-emerald-400/90' : 'text-rose-400/90'
+                            }`}
+                          >
+                            {formatPercent(priceDeltaPct, stealthMode)} MoM
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-slate-500">
+                            {ast.isCash ? `${curr} Rate` : 'Unit Price'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
+
       {/* Charts Section Container */}
-      <div className={chartType === 'all' ? "grid grid-cols-1 xl:grid-cols-2 gap-8" : ""}>
+      <div className={chartType === 'all' ? "grid grid-cols-1 xl:grid-cols-2 gap-6" : ""}>
 
         {/* ---------------------------------------------------- */}
         {/* PIE CHART RENDER */}
         {/* ---------------------------------------------------- */}
         {(chartType === 'pie' || chartType === 'all') && (
-          <div className={chartType === 'all' ? "bg-slate-950/40 p-5 rounded-2xl border border-slate-800/80" : ""}>
+          <div className={chartType === 'all' ? "bg-[#080C14]/70 p-5 rounded-xl border border-slate-800/80" : ""}>
             {chartType === 'all' && (
               <div className="flex items-center justify-between mb-4 border-b border-slate-800/80 pb-3">
                 <div className="flex items-center gap-2">
                   <PieChartIcon className="w-4 h-4 text-emerald-400" />
-                  <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Portfolio</span>
+                  <span className="text-xs font-bold text-slate-200 tracking-tight">Portfolio Allocation</span>
                 </div>
               </div>
             )}
@@ -828,7 +955,7 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
                 
                 {/* Pie / Donut Canvas */}
                 <div className={chartType !== 'all' ? "lg:col-span-7 h-80 relative flex items-center justify-center" : "w-full lg:w-1/2 h-80 relative flex items-center justify-center"}>
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <PieChart>
                     <Pie
                       data={pieChartData}
@@ -932,6 +1059,19 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
                                 {formatCurrency(data.value, currencySymbol, stealthMode)}
                                 {` (${data.percentage.toFixed(1)}%)`}
                               </div>
+                              {data.unitPrice !== undefined && (
+                                <div className="text-[11px] font-mono text-emerald-400 font-semibold">
+                                  Unit Price:{' '}
+                                  {data.isBaseCash
+                                    ? `${currencySymbol} 1 (Base)`
+                                    : formatCurrency(data.unitPrice, currencySymbol, stealthMode)}
+                                  {data.quantity !== undefined && (
+                                    <span className="text-slate-400 font-normal">
+                                      {' '}· Qty: {stealthMode ? '••••' : formatNumberWithCommas(data.quantity)}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                               {data.categoryName && (
                                 <div className="text-[10px] text-slate-400">
                                   Category: {data.categoryName}
@@ -968,43 +1108,66 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
                       </span>
                     );
                   })()}
-                  <span className="text-[10px] text-emerald-400 font-medium max-w-[115px] truncate">
-                    {formatMonthName(selectedMonth)}
-                  </span>
+                  {activeMonthRecord?.isLivePending || isLiveMonth(selectedMonth) ? (
+                    <span className="inline-flex items-center justify-center gap-1 text-[10px] text-emerald-400 font-semibold max-w-[115px] truncate">
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                      </span>
+                      <span>Live</span>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-emerald-400 font-medium max-w-[115px] truncate">
+                      {formatMonthName(selectedMonth)}
+                    </span>
+                  )}
                 </div>
               </div>
 
               {/* Pie Legend & Ratio List with Custom Aesthetic Scrollbar */}
               <div className={chartType !== 'all' ? "lg:col-span-5 space-y-2 max-h-80 overflow-y-auto custom-scrollbar pr-2.5" : "w-full lg:w-1/2 space-y-2 max-h-80 overflow-y-auto custom-scrollbar pr-2.5"}>
-                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 sticky top-0 bg-slate-900/95 py-1 backdrop-blur-xs z-10">
-                  {groupMode === 'asset' && 'Asset Allocation Ratio'}
+                <h4 className="text-xs font-semibold text-slate-300 mb-2 sticky top-0 bg-[#0D131F]/95 py-1 backdrop-blur-xs z-10">
+                  {groupMode === 'asset' && 'Asset Allocation Ratio & Prices'}
                   {groupMode === 'category' && 'Category Allocation Ratio'}
                   {groupMode === 'risk' && 'Risk Level Exposure Ratio'}
                 </h4>
 
-                {pieChartData.map((item) => (
+                {pieChartData.map((item: any) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 hover:border-emerald-500/40 hover:bg-slate-900/90 transition-none text-xs"
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-[#080C14]/80 border border-slate-800/80 hover:border-emerald-500/40 transition-colors text-xs"
                   >
                     <div className="flex items-center space-x-2.5 min-w-0">
                       <span
-                        className="w-3 h-3 rounded-md shrink-0"
+                        className="w-2.5 h-2.5 rounded-sm shrink-0"
                         style={{ backgroundColor: item.color }}
                       />
                       <div className="truncate">
-                        <span className="font-semibold text-slate-200 block truncate">
-                          {item.name}
-                        </span>
+                        <div className="font-semibold text-slate-200 flex items-center gap-1.5 truncate">
+                          <span className="truncate">{item.name}</span>
+                          {item.tickerSymbol && (
+                            <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                              ({item.tickerSymbol})
+                            </span>
+                          )}
+                        </div>
                         {item.categoryName && (
-                          <span className="text-[10px] text-slate-400 block truncate">
-                            {item.categoryName} ({item.riskLevel} Risk)
+                          <span className="text-[10px] text-slate-500 block truncate">
+                            {item.categoryName} <span aria-hidden="true">·</span> {item.riskLevel} Risk
+                            {item.unitPrice !== undefined && (
+                              <>
+                                {' '}<span aria-hidden="true">·</span>{' '}
+                                <span className="font-mono text-emerald-400 font-medium">
+                                  Price: {item.isBaseCash ? `${currencySymbol} 1` : formatCurrency(item.unitPrice, currencySymbol, stealthMode)}
+                                </span>
+                              </>
+                            )}
                           </span>
                         )}
                       </div>
                     </div>
 
-                    <div className="text-right shrink-0 font-mono ml-2">
+                    <div className="text-right shrink-0 font-mono tabular-nums ml-2">
                       <div className="font-bold text-slate-100">
                         {item.percentage.toFixed(1)}%
                       </div>
@@ -1025,20 +1188,20 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
       {/* STACKED BAR CHART RENDER */}
       {/* ---------------------------------------------------- */}
       {(chartType === 'stackedBar' || chartType === 'all') && (
-        <div className={`space-y-4 ${chartType === 'all' ? "bg-slate-950/40 p-5 rounded-2xl border border-slate-800/80" : ""}`}>
+        <div className={`space-y-4 ${chartType === 'all' ? "bg-[#080C14]/70 p-5 rounded-xl border border-slate-800/80" : ""}`}>
           {(chartType === 'all' || chartType === 'stackedBar') && (
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3 border-b border-slate-800/80 pb-3">
               <div className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-emerald-400" />
-                <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Asset Growth</span>
+                <span className="text-xs font-bold text-slate-200 tracking-tight">Asset Growth Trajectory</span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center space-x-1 bg-slate-900 p-1 rounded-lg border border-slate-800 text-xs font-semibold">
+                <div className="flex items-center gap-1 bg-[#080C14] p-1 rounded-lg border border-slate-800 text-xs font-semibold">
                   <button
                     onClick={() => setBarTimeScale('monthly')}
                     className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                       barTimeScale === 'monthly'
-                        ? 'bg-emerald-500 text-slate-950 shadow-xs font-bold'
+                        ? 'bg-emerald-500 text-slate-950 font-bold'
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
@@ -1048,7 +1211,7 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
                     onClick={() => setBarTimeScale('yearly')}
                     className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                       barTimeScale === 'yearly'
-                        ? 'bg-emerald-500 text-slate-950 shadow-xs font-bold'
+                        ? 'bg-emerald-500 text-slate-950 font-bold'
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
@@ -1057,7 +1220,7 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
                 </div>
 
                 <div
-                  className={`flex items-center space-x-1 bg-slate-900 p-1 rounded-lg border border-slate-800 text-xs font-semibold transition-all duration-200 ${
+                  className={`flex items-center gap-1 bg-[#080C14] p-1 rounded-lg border border-slate-800 text-xs font-semibold transition-all duration-200 ${
                     barTimeScale === 'monthly' ? 'opacity-100' : 'invisible pointer-events-none'
                   }`}
                 >
@@ -1065,7 +1228,7 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
                     onClick={() => setBarYearMode('all')}
                     className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                       barYearMode === 'all'
-                        ? 'bg-emerald-500 text-slate-950 shadow-xs font-bold'
+                        ? 'bg-emerald-500 text-slate-950 font-bold'
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
@@ -1075,7 +1238,7 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
                     onClick={() => setBarYearMode('single')}
                     className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                       barYearMode === 'single'
-                        ? 'bg-emerald-500 text-slate-950 shadow-xs font-bold'
+                        ? 'bg-emerald-500 text-slate-950 font-bold'
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
@@ -1084,13 +1247,13 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
                 </div>
 
                 <div
-                  className={`flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800 text-xs select-none transition-all duration-200 ${
+                  className={`flex items-center gap-1 bg-[#080C14] p-1 rounded-lg border border-slate-800 text-xs select-none transition-all duration-200 ${
                     barTimeScale === 'yearly' || barYearMode === 'all'
                       ? 'opacity-100'
                       : 'invisible pointer-events-none'
                   }`}
                 >
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold px-1">Zoom:</span>
+                  <span className="text-[10px] text-slate-400 font-semibold px-1">Zoom:</span>
                   <button
                     onClick={() => setZoomLevel((prev) => Math.max(0.25, Number((prev - 0.25).toFixed(2))))}
                     disabled={zoomLevel <= 0.25}
@@ -1135,7 +1298,7 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
             <div className="flex flex-row items-stretch w-full overflow-hidden relative">
               {/* Pinned Y-Axis on the left */}
               <div className="w-[84px] shrink-0 h-80 bg-slate-900/90 z-10 border-r border-slate-800/60 select-none pr-1">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <ComposedChart
                     data={barChartData}
                     margin={{ top: 25, right: 0, left: 2, bottom: 35 }}
@@ -1165,7 +1328,7 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
                     minWidth: '100%',
                   }}
                 >
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <ComposedChart
                       data={barChartData}
                       margin={{ top: 25, right: 25, left: 15, bottom: 35 }}
@@ -1240,8 +1403,20 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
                             return (
                               <div className="bg-slate-950 border border-slate-800 p-3.5 rounded-xl shadow-2xl text-xs space-y-2.5 min-w-56 pointer-events-none relative z-50">
                                 <div className="border-b border-slate-800 pb-2">
-                                  <div className="font-bold text-slate-100 flex items-center justify-between">
-                                    <span>{label}</span>
+                                  <div className="font-bold text-slate-100 flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-1.5">
+                                      {dataPoint.isLive ? (
+                                        <span className="inline-flex items-center gap-1.5 text-emerald-400 font-semibold">
+                                          <span className="relative flex h-2 w-2">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                                          </span>
+                                          <span>Live</span>
+                                        </span>
+                                      ) : (
+                                        <span>{label}</span>
+                                      )}
+                                    </div>
                                     <span className="text-emerald-400 font-mono">
                                       {formatCurrency(totalVal, currencySymbol, stealthMode)}
                                     </span>
@@ -1314,14 +1489,21 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
                                   ? entry.month && entry.month.split('-')[0] === pieSelectedYear
                                   : entry.month === selectedMonth
                               );
+                              const isLiveBar = Boolean(entry.isLive);
+                              const baseOpacity = isLiveBar ? 0.65 : 1;
+                              const computedOpacity = selectedBarData
+                                ? (isSelected ? (isLiveBar ? 0.8 : 1) : 0.35)
+                                : baseOpacity;
+
                               return (
                                 <Cell
                                   key={`cell-${cellIdx}`}
                                   fill={keyObj.color}
-                                  fillOpacity={selectedBarData ? (isSelected ? 1 : 0.45) : 1}
-                                  stroke={isSelected ? '#34d399' : 'none'}
-                                  strokeWidth={isSelected ? 1.5 : 0}
-                                  className="cursor-pointer transition-all duration-200"
+                                  fillOpacity={computedOpacity}
+                                  stroke={isSelected ? '#34d399' : isLiveBar ? '#38bdf8' : 'none'}
+                                  strokeDasharray={isLiveBar && !isSelected ? '3 2' : undefined}
+                                  strokeWidth={isSelected ? 1.5 : isLiveBar ? 1.25 : 0}
+                                  className={`cursor-pointer transition-all duration-200 ${isLiveBar ? 'animate-pulse' : ''}`}
                                   onClick={() => {
                                     if (entry.month && entry.month.includes('-')) {
                                       const [yr, mo] = entry.month.split('-');
@@ -1389,6 +1571,12 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
                 <div className="flex items-center gap-1.5">
                   <span className="w-3.5 h-0.5 border-b-2 border-dashed border-[#38bdf8] inline-block shrink-0" />
                   <span className="text-slate-300 font-medium">Total Capital Invested</span>
+                </div>
+              )}
+              {barChartData.some((d) => d.isLive) && (
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-xs border border-dashed border-sky-400 bg-sky-500/30 animate-pulse inline-block shrink-0" />
+                  <span className="text-sky-300 font-medium">Live / Ongoing Period</span>
                 </div>
               )}
             </div>

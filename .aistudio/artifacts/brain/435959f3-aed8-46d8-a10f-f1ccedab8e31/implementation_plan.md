@@ -1,171 +1,128 @@
-# Portfolio Rebalancing Feature for ValuaQ
+# ValuaQ Institutional FinTech UI Elevation
 
-A dedicated, production-grade Portfolio Rebalancing workbench that empowers investors to set target category allocations, monitor allocation drift in real-time against current valuations, and execute both **Cash-Flow Contribution Rebalancing** (deposit-only, zero tax/sales) and **Classic Full Rebalancing** (trim overweight & buy underweight).
-
----
+A comprehensive visual and spatial refinement of the ValuaQ 3-Level Portfolio & Risk Engine, elevating the interface to an institutional-grade FinTech dark aesthetic while preserving every core valuation, ledger, and cloud synchronization capability.
 
 ### User Review & Critical Decisions
 
 > [!IMPORTANT]
-> The following architectural decisions have been confirmed and will guide the build:
+> The following architectural and aesthetic choices have been locked in based on your preferences and will guide the visual overhaul without altering any underlying portfolio calculations or data models.
 
-- **Target Level: Category Level**: Target allocation percentages are assigned to each asset category (e.g., Stocks, Real Estate, Crypto, Cash & Fixed Income), which cleanly groups underlying assets while keeping allocation strategy intuitive and manageable.
-- **Navigation Placement: Dedicated Top Navigation Tab**: A dedicated `"Rebalance"` tab will sit alongside *Dashboards*, *Monthly Spreadsheet*, and *Assets & Risk Hierarchy* in the top navigation bar, featuring a balance scale icon (`Scale` / `Sliders`).
-- **Rebalance Execution Engines**:
-  1. **Cash-Flow / Contribution Mode (Default, Recommended)**: Automatically calculates how to distribute next month's new deposit (or any custom capital injection) exclusively into underweight categories to bring the portfolio back into balance *without selling any holdings*.
-  2. **Full Classic Rebalancing Mode**: For quarterly/annual portfolio resets, calculates exact dollar amounts to trim/sell from overweight categories and deploy into underweight categories to achieve a 100% target match immediately.
-- **Persistence & Cloud Sync**: Target percentages are stored on Category records (`targetPercent?: number`), automatically syncing to localStorage and Google Firebase Cloud Firestore without breaking existing data, backups, or exports.
+- **Confirmed Decision 1 — Aesthetic Direction**: **Institutional FinTech Dark (Obsidian & Emerald)** featuring deep obsidian surfaces (`#090D16` / `#0F172A`), crisp hairline borders (`#1E293B`), high-contrast emerald accents (`#10B981`), and strict `tabular-nums` monospace alignment for all financial figures.
+- **Confirmed Decision 2 — Navigation & Layout**: **Streamlined Top Navigation with Unified Workspace** combining brand identity, single-line view navigation links, and essential workspace controls into a cohesive, uncluttered header bar.
+- **Confirmed Decision 3 — Priority Focus Areas**: **Top KPI Summary Cards & Net Worth Banner**, **Transaction Ledger Table & Monthly Groupings**, and **Portfolio Charts & Interactive Data Visualizations**, while ensuring visual harmony across the Monthly Spreadsheet and Hierarchy views.
 
 ---
 
 ### 1. Overview & Core Concept
 
-#### What It Does
-The Portfolio Rebalancing tool solves the core problem of **portfolio drift**: as market prices fluctuate, higher-performing assets expand beyond their desired risk tolerance, while lower-performing or stable assets shrink. 
-
-Users can:
-1. Define their ideal target allocation percentage for each category (with auto-normalization and validation that totals sum to 100%).
-2. Instantly see their **Actual vs. Target Allocation** via side-by-side comparison bars, current monetary value, target monetary value, and drift delta (`±X.X%`, `±$Amount`).
-3. View clear visual status badges:
-   - 🟢 **Balanced**: Within acceptable tolerance (e.g. within ±1.5% of target).
-   - 🟡 **Underweight**: Below target; recommended for capital additions.
-   - 🔴 **Overweight**: Above target; candidate for profit-taking or pausing new contributions.
-4. Use the **Interactive Rebalance Calculator**:
-   - Pre-fills with the most recent month's new capital (`monthlyMoneyInvested`) or allows typing any deposit amount.
-   - Generates an actionable order list: *"Allocate NT$ 18,500 to Stocks, NT$ 6,500 to Fixed Income, NT$ 0 to Crypto"*.
-   - Provides a simulated "After Rebalance" preview bar showing how the portfolio distribution will look once the plan is carried out.
-
-#### Target Audience & Persona
-Long-term buy-and-hold investors, passive indexers, and multi-asset wealth builders who practice dollar-cost averaging (DCA) and want disciplined, emotion-free capital allocation.
+- **What It Does**: Transforms the visual presentation of ValuaQ into a precision financial workstation. It replaces generic multi-pill clutter and heavy nested boxes with clean typographic hierarchy, scannable tabular data grids, and balanced executive KPI strips.
+- **Target Audience / Persona**: Quantitative and long-term personal investors managing multi-currency assets (NTD, USD, stocks, ETFs, crypto, gold) who value speed, clarity, and institutional-grade visual discipline.
+- **Key Value**: Faster visual scanning of net worth, floating P&L, and monthly ledger activity through reduced visual noise, aligned decimal columns, and refined interactive controls.
 
 ---
 
 ### 2. User Experience & Visual Design
 
-#### Key User Flows
+- **Key User Flows**:
+  1. **Unified Top Bar & Workspace Utility**: Users switch effortlessly between *Dashboards*, *Transaction Ledger*, *Monthly Spreadsheet*, *Assets & Risk*, and *Rebalance* from a single-row navigation header, with quick access to Stealth Mode, Cloud Sync, and Data Backup in a secondary utility strip or compact right-hand action zone.
+  2. **Executive Net Worth & KPI Strip**: On the Dashboard and Ledger views, users immediately see primary capital figures formatted with crisp tabular numerals, clean inline metadata separators (`·`), and proportional risk distribution bars instead of stacked pill badges.
+  3. **High-Density Collapsible Transaction Ledger**: Users filter by Month, Action, or Asset in a unified command bar, expand or collapse monthly ledger groups with a single tap, and cycle through single-asset holdings in the *Current Quantity Balances* card using tactile up/down steppers or open the full breakdown modal.
+  4. **Interactive Portfolio Charts**: Users inspect asset allocation and historical growth curves with refined dark-slate tooltips, clean segmented chart toggles, and uncluttered axis typography.
 
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        Top Navigation Bar                              │
-│ [ Dashboards ]   [ Monthly Spreadsheet ]   [ Assets Hierarchy ]   [★ Rebalance ] │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │ Click
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│ 1. Header & Summary Strip                                              │
-│    • Total Portfolio Value  • Overall Drift Score  • Rebalance Status  │
-├────────────────────────────────────────────────────────────────────────┤
-│ 2. Target Allocation Setup Panel                                       │
-│    • Category target % inputs (inline numeric stepper / slider)        │
-│    • Live Sum Checker: "Total: 100% [Valid]" (or warning if ≠ 100%)    │
-│    • Quick Presets button (e.g. Equal Weight, 60/40 Core, All-Weather)│
-├────────────────────────────────────────────────────────────────────────┤
-│ 3. Target vs. Actual Allocation Grid (Data-Dense Table + Mini Bars)    │
-│    • Category  • Current Value  • Actual %  • Target %  • Drift (±%)   │
-│    • Visual Target Bar with Actual Marker                              │
-│    • Action Status (Underweight / Balanced / Overweight)               │
-├────────────────────────────────────────────────────────────────────────┤
-│ 4. Rebalancing Action Planner                                          │
-│    Mode Selector: [ ⚡ Deposit Only (No Selling) ]  [ 🔄 Full Rebalance ]│
-│    Deposit Input: [ NT$ 30,000 ] (Quick buttons: +5k, +10k, This Month) │
-│                                                                        │
-│    Action Recommendations Card:                                        │
-│    ┌──────────────────────────────────────────────────────────────┐    │
-│    │ • Stocks: Add +NT$ 18,500 (Brings from 52% → 58.5%)          │    │
-│    │ • Real Estate: Add +NT$ 11,500 (Brings from 23% → 25%)      │    │
-│    │ • Crypto: Add NT$ 0 (Hold, currently overweight at 14%)      │    │
-│    └──────────────────────────────────────────────────────────────┘    │
-│    Interactive "After Rebalance" Visual Projection Comparison          │
-└────────────────────────────────────────────────────────────────────────┘
-```
+- **Visual Identity & Theme**:
+  - *Aesthetic Direction*: **Institutional FinTech Dark** — inspired by modern quantitative wealth platforms (Linear, Mercury, Stripe Financial).
+  - *Color Palette & Mood*:
+    - **60% Dominant Canvas**: Deep Obsidian (`#080C14` / `slate-950`) for the primary viewport background.
+    - **30% Structural Surfaces**: Elevated Slate (`#0F172A` / `slate-900`) with crisp 1px hairline borders (`rgba(148, 163, 184, 0.12)`) and subtle top-edge specular highlights.
+    - **10% Semantic Accents**: Emerald (`#10B981`) for positive P&L, active navigation states, and primary CTAs; Violet (`#8B5CF6`) for passive dividend yield; Amber (`#F59E0B`) for Emergency Fund safety reserves; Rose (`#F43F5E`) for withdrawals and drawdowns.
+  - *Typography & Hierarchy*:
+    - **Display & UI Structure**: `Plus Jakarta Sans` for crisp, modern headings, navigation links, and card titles (`tracking-tight`, `font-semibold`).
+    - **Financial Data & Telemetry**: `JetBrains Mono` with `font-variant-numeric: tabular-nums` enforced across all currency values, quantities, percentages, dates, and table columns so decimal points align vertically.
+  - *Component Styling & Layout*:
+    - **Zero-Pill Metadata Discipline**: Replace static rounded pill enclosures on informational labels (such as timestamps, entry counts, and secondary descriptions) with clean inline typography separated by subtle middots (`·`).
+    - **Single-Elevation Depth**: Flat, structured cards separated by 1px hairline borders and consistent `16px–24px` spatial rhythm, eliminating cards nested inside cards or decorative blurred background blobs.
 
-#### Visual Identity & Styling
-- **Canvas & Surfaces**: Matches ValuaQ's sleek dark theme (`#0B1120` canvas, `#0F172A` cards, `#1E293B` borders).
-- **Domain Aesthetic**: High-density financial dashboard layout with crisp tabular figures (`tabular-nums`, `font-mono`).
-- **Zero-Pill Restraint**: Drift statuses use clean, unboxed typographic markers and subtle indicators instead of bloated pill badges.
-- **Color Discipline**:
-  - Emerald (`#10B981`): Balanced allocation / Capital addition recommended.
-  - Amber (`#F59E0B`): Moderate drift / Underweight target.
-  - Rose (`#F43F5E`): Significant overweight drift (in Full Rebalance mode, indicates trim/sell amount).
-  - Blue (`#3B82F6`): Neutral target markers and simulated projection comparisons.
-- **Stealth Mode Compliance**: Respects the global stealth privacy mode eye toggle (`***`) for all dollar figures while keeping percentages visible for strategic planning in public.
+- **Interactive Feedback & Motion**:
+  - Fast, responsive `150ms` transitions (`cubic-bezier(0.16, 1, 0.3, 1)`) on table row hovers, collapsible monthly headers, and segmented control switches.
+  - Tactile hover states on the single-asset balance cycler and emergency fund `+` / `−` quick-action buttons.
 
 ---
 
-### 3. Key Product Decisions & Mathematical Strategy
+### 3. Key Product Decisions & Trade-Offs
 
-#### Decision 1: Optimal Contribution Algorithm (Deposit-Only Water-Filling)
-- *Problem*: In deposit-only rebalancing, a fixed deposit $D$ may not be enough to bring all underweight assets fully to target without selling overweight assets.
-- *Solution*: A modified **water-filling algorithm**:
-  1. Compute the new total portfolio value: $V_{\text{new}} = V_{\text{current}} + D$.
-  2. For each category $i$, target value is $T_i = V_{\text{new}} \times (\text{targetPercent}_i / 100)$.
-  3. Shortfall is $S_i = \max(0, T_i - V_i)$.
-  4. If the sum of shortfalls $\sum S_i \le D$, allocate $S_i$ to each underweight category, and divide any remaining surplus proportionally to target weights.
-  5. If $\sum S_i > D$, prioritize categories with the greatest relative deficit, scaling allocations proportionally so exactly $D$ is deployed and no category is assigned negative dollars.
+- **Decision 1: Streamlined Single-Row Navigation + Contextual Workspace Utility**
+  - *Chosen Approach*: Consolidate the primary navigation tabs and brand identity into a clean top bar, moving secondary utilities (Currency indicator, Backup/Restore, Factory Reset) into a compact, non-intrusive utility group.
+  - *Why*: Eliminates the multi-row header clutter on desktop and keeps vertical viewport space focused on financial data and charts.
+  - *Alternatives Considered*: Full collapsible left sidebar (passed over to honor your preference for a streamlined top navigation bar).
 
-#### Decision 2: Target Storage & Cloud Sync Invariants
-- *Problem*: Where should target percentages be stored to ensure zero data loss during sync?
-- *Solution*: Store `targetPercent?: number` directly within each `Category` object in `src/types.ts`.
-  - Automatically persisted to `localStorage` via existing `saveCategories`.
-  - Automatically merged across devices in `src/lib/syncMerge.ts` via category union.
-  - Automatically pushed to Google Firestore in `users/{userId}` without modifying security rules.
-  - Automatically preserved in JSON system backups and Excel/CSV exports.
+- **Decision 2: Proportional Risk Bar & Unboxed Metadata in KPI Cards**
+  - *Chosen Approach*: Upgrade the 6 Dashboard KPI cards and 4 Ledger Overview cards to use clean typographic kickers, `tabular-nums` hero numbers, and a visual horizontal progress bar for *Risk Distribution* (`Low` / `Medium` / `High`).
+  - *Why*: Removes decorative background blur orbs and static pill clutter, allowing the eye to lock onto Total Capital, Floating P&L, and MoM performance immediately.
+  - *Alternatives Considered*: Keeping stacked pill badges for risk levels (harder to scan proportions at a glance).
+
+- **Decision 3: High-Density Tabular Ledger with Refined Month Headers**
+  - *Chosen Approach*: Style the Transaction Ledger as an institutional blotter with right-aligned numeric quantity columns, subtle action indicators, and sleek collapsible month group headers showing inline summary counts (`+Add · Convert · Withdraw · Yield`).
+  - *Why*: Preserves all existing collapsible behaviors (`All Months` defaults to hidden; specific month defaults to shown) while dramatically improving horizontal scannability and professional polish.
 
 ---
 
-### 4. Technical Architecture & Component Mapping
+### 4. Technical Architecture & Data Strategy *(Technical Reference)*
+
+- **Architecture & Component Diagram**:
 
 ```
-┌───────────────────────────────────────────────────────────────────────────┐
-│                                 App.tsx                                   │
-│   • activeTab state: 'dashboard' | 'spreadsheet' | 'hierarchy' | 'rebalance'│
-│   • State: categories, assets, records, settings, user                    │
-│   • Handler: onUpdateCategoryTarget(categoryId, targetPercent)            │
-│   • Handler: onBatchUpdateTargets(Record<string, number>)                 │
-└─────────────────────────────────────┬─────────────────────────────────────┘
-                                      │
-              ┌───────────────────────┴───────────────────────┐
-              ▼                                               ▼
-┌───────────────────────────────┐               ┌───────────────────────────┐
-│     components/Header.tsx     │               │ components/RebalanceView  │
-│ • 'Rebalance' Nav button      │               │ • Target Setup Table      │
-│ • Scale icon                  │               │ • Target vs Actual Visuals│
-│ • Active indicator styling    │               │ • Drift Metrics Matrix    │
-└───────────────────────────────┘               │ • Water-filling Engine    │
-                                                │ • Mode Toggle             │
-                                                │ • Execution Orders Card   │
-                                                │ • Projected Distribution  │
-                                                └───────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                        ValuaQ Application Shell (App)                        │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │           Streamlined Top Header & Unified Navigation Bar              │  │
+│  │  [ValuaQ Brand]  ──  [Dashboards | Ledger | Sheet | Assets | Rebalance]│  │
+│  │                      [Stealth Toggle | Cloud Sync | Data Utilities]    │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│                                      │                                       │
+│         ┌────────────────────────────┼────────────────────────────┐          │
+│         ▼                            ▼                            ▼          │
+│  ┌──────────────────────┐ ┌────────────────────────┐ ┌────────────────────┐  │
+│  │   Dashboard View     │ │  Transaction Ledger    │ │  Secondary Views   │  │
+│  │  ┌────────────────┐  │ │  ┌──────────────────┐  │ │  ┌──────────────┐  │  │
+│  │  │ Executive KPI  │  │ │  │ 4-Card Summary   │  │ │  │ Spreadsheet  │  │  │
+│  │  │ 6-Card Grid &  │  │ │  │ Banner + 1-Asset │  │ │  │ Matrix       │  │  │
+│  │  │ Risk Bar       │  │ │  │ Cycler (Up/Down) │  │ │  ├──────────────┤  │  │
+│  │  ├────────────────┤  │ │  ├──────────────────┤  │ │  │ Risk & Asset │  │  │
+│  │  │ Interactive    │  │ │  │ Filter Toolbar   │  │ │  │ Hierarchy    │  │  │
+│  │  │ Filter Strip   │  │ │  │ (Max-H Dropdowns)│  │ │  ├──────────────┤  │  │
+│  │  ├────────────────┤  │ │  ├──────────────────┤  │ │  │ Portfolio    │  │  │
+│  │  │ Portfolio Pie  │  │ │  │ Collapsible      │  │ │  │ Rebalancing  │  │  │
+│  │  │ & Growth Charts│  │ │  │ Monthly Blotter  │  │ │  └──────────────┘  │  │
+│  │  └────────────────┘  │ │  └──────────────────┘  │ └────────────────────┘  │
+│  └──────────────────────┘ └────────────────────────┘                         │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### Component & Helper Structure
-1. `src/types.ts`:
-   - Extend `Category` with `targetPercent?: number`.
-   - Add rebalance calculation types: `CategoryRebalanceItem`, `RebalanceMode`, `RebalancePlan`.
-2. `src/lib/rebalanceEngine.ts`:
-   - Pure, thoroughly tested calculation engine:
-     - `calculateCategoryActuals(categories, assets, latestRecord)`
-     - `calculateCashFlowRebalance(items, depositAmount)`
-     - `calculateFullRebalance(items)`
-     - `calculatePortfolioDriftScore(items)`
-3. `src/components/RebalanceView.tsx`:
-   - Main view component rendering the header statistics, target allocation manager, target vs. actual visual progress bars, interactive deposit slider/input, and simulated action summary.
-4. `src/components/Header.tsx` & `src/App.tsx`:
-   - Wire `'rebalance'` tab navigation, state management, and updates.
+- **Data Model & State**:
+  - Zero breaking changes to `Category`, `Asset`, `LedgerTransaction`, `MonthlyRecord`, or `MonthlyPriceMap`.
+  - Preserves all USD/foreign currency valuation logic, 1st-of-month snapshot rules, Emergency Fund P&L exclusion, and Firebase Union-Guard cloud synchronization.
+- **Interactive Component & State Mapping**:
+  - **Header Navigation & Utilities**: Active tab switching, Stealth Mode masking (`••••`), Google Cloud Sync trigger, and Backup/Restore modal triggers remain 100% wired.
+  - **Ledger Overview & Blotter**: Preserves the 4-card overview grid, compact `-` / `+` Emergency Fund triggers, single-asset carousel (`ChevronUp` / `ChevronDown` with `stopPropagation` and full-card modal click), simplified Action labels (`Add`, `Convert`, `Withdraw`, `Yield`), directional Sort button (`ArrowUp` / `ArrowDown`), and collapsible monthly headers without `(Tap to show/hide)` text.
+  - **CustomDropdown**: Enhances the scrollable (`max-h-60`) dropdown menu styling to match the new obsidian-and-emerald surface tokens across all views and modals.
 
 ---
 
-### 5. Verification & Testing Plan
+### 5. Live Timeline & 6M Monthly Savings Chart Precision
 
-1. **Algorithm Correctness**:
-   - Sum to 100% validation check.
-   - Deposit amount equal to $0, small deposit ($100), large deposit ($100,000), and exact balance deposit.
-   - Verify that Cash-Flow mode never produces negative allocations (never tells user to sell).
-   - Verify that Full Rebalance mode produces exact zero-sum adjustments (Trims = Buys).
-2. **Stealth Mode Testing**:
-   - Toggle stealth mode and confirm that dollar values become asterisks while percentages, drift deltas, and progress bars remain crisp and operational.
-3. **Data Persistence & Export/Import Safety**:
-   - Modify targets, refresh page, verify localStorage persistence.
-   - Verify CSV and Excel exports continue to work seamlessly.
-4. **Applet Compilation & Linting**:
-   - Run `compile_applet` and `lint_applet` to guarantee clean zero-error TypeScript build.
+- **Live In-Progress Month (`2026-11`)**:
+  - The upcoming ongoing month (**November 2026**) is designated as the `Live` month (`isLivePending: true`).
+  - Displays real-time spot prices, live portfolio valuation, and the pulsating `LIVE` badge in the Spreadsheet and Stacked Bar charts.
+- **Finalized Historical Months (May to October 2026)**:
+  - October 2026 and prior months are treated as closed 1st-of-month snapshot records (`isLivePending: false`).
+- **6M Monthly Savings Bar Chart**:
+  - Excludes the `isLivePending` month so the visualization strictly reflects the 6 completed historical months (**May to October 2026**).
+  - Calculates stability statistics (average, standard deviation, and trajectory) solely against finalized, closed months to prevent distortion from intra-month partial savings.
+
+---
+
+### Verification
+- `tsc --noEmit`: 0 TypeScript errors.
+- `npm run build`: Vite production build passed cleanly.
+- Live month correctly isolated to November (`2026-11`).
+- 6M savings chart correctly displays May, Jun, Jul, Aug, Sep, Oct (`2026-05` to `2026-10`).

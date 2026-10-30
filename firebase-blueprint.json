@@ -12,6 +12,8 @@
         "categories": { "type": "array" },
         "assets": { "type": "array" },
         "monthlyRecords": { "type": "array" },
+        "transactions": { "type": "array" },
+        "monthlyAssetPrices": { "type": "object" },
         "settings": { "type": "object" }
       }
     }

@@ -70,10 +70,21 @@ export function formatPercent(value: number, stealthMode: boolean = false): stri
 }
 
 /**
- * Format month string "2026-01" -> "Jan 2026"
+ * Checks whether a month key corresponds to the current live period (2026-11)
+ */
+export function isLiveMonth(monthStr?: string | null): boolean {
+  if (!monthStr) return false;
+  const trimmed = monthStr.trim();
+  return trimmed === '2026-11' || trimmed.toLowerCase() === 'live';
+}
+
+/**
+ * Format month string "2026-01" -> "Jan 2026", or "2026-11" -> "Live"
  */
 export function formatMonthName(monthStr: string): string {
-  if (!monthStr || !monthStr.includes('-')) return monthStr;
+  if (!monthStr) return monthStr;
+  if (isLiveMonth(monthStr)) return 'Live';
+  if (!monthStr.includes('-')) return monthStr;
   const [year, month] = monthStr.split('-');
   const date = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
   return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });

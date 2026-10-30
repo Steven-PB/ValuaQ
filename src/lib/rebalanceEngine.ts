@@ -1,7 +1,30 @@
 import { Category, Asset, MonthlyRecord, RebalanceMode, CategoryRebalanceItem, RebalanceAnalysis } from '../types';
+import { isEmergencyFundAsset } from './ledgerEngine';
+
+/**
+ * Checks whether a category is designated as an Emergency Fund safety net category.
+ */
+export function isEmergencyFundCategory(cat?: Category | null, assets: Asset[] = []): boolean {
+  if (!cat) return false;
+  if (cat.isEmergencyFundCategory) return true;
+  const lower = (cat.name || '').toLowerCase();
+  if (
+    lower.includes('emergency fund') ||
+    lower.includes('emergency reserve') ||
+    lower.includes('safety net')
+  ) {
+    return true;
+  }
+  const catAssets = assets.filter((a) => a.categoryId === cat.id);
+  if (catAssets.length > 0 && catAssets.every((a) => isEmergencyFundAsset(a))) {
+    return true;
+  }
+  return false;
+}
 
 /**
  * Computes the aggregated current value of each category based on the latest monthly record.
+ * Strictly excludes Emergency Fund assets (Rule 4: Rebalancing Immunity).
  */
 export function computeCategoryValues(
   categories: Category[],
@@ -19,16 +42,20 @@ export function computeCategoryValues(
     return categoryValues;
   }
 
-  // Create an assetId -> categoryId lookup map
-  const assetCategoryMap = new Map<string, string>();
+  // Create an assetId -> Asset lookup map (excluding Emergency Fund assets)
+  const assetMap = new Map<string, Asset>();
   assets.forEach((asset) => {
-    assetCategoryMap.set(asset.id, asset.categoryId);
+    if (!isEmergencyFundAsset(asset)) {
+      assetMap.set(asset.id, asset);
+    }
   });
 
   // Sum asset values by category
   Object.entries(latestRecord.assetValues).forEach(([assetId, rawValue]) => {
+    const asset = assetMap.get(assetId);
+    if (!asset) return;
     const val = typeof rawValue === 'number' && !isNaN(rawValue) ? rawValue : 0;
-    const catId = assetCategoryMap.get(assetId);
+    const catId = asset.categoryId;
     if (catId && categoryValues[catId] !== undefined) {
       categoryValues[catId] += val;
     }

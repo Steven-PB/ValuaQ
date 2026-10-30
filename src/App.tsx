@@ -4,17 +4,34 @@ import {
   loadCategories, saveCategories, 
   loadAssets, saveAssets, 
   loadMonthlyRecords, saveMonthlyRecords, recalculateMonthlyRecords,
+  loadTransactions, saveTransactions,
+  loadMonthlyPrices, saveMonthlyPrices,
+  loadMonthlyNotes, saveMonthlyNotes, setMonthNote,
   loadSettings, saveSettings, 
-  resetToDemoData,
+  resetToDemoData, resetAllDataToZero,
   loadDeletedMonths, saveDeletedMonths, addDeletedMonth, removeDeletedMonth 
 } from './lib/storage';
 import { 
   mergeMonthlyRecords, 
   mergeCategories, 
   mergeAssets, 
-  mergeSettings 
+  mergeSettings,
+  mergeTransactions,
+  mergeMonthlyPrices
 } from './lib/syncMerge';
-import { Category, Asset, MonthlyRecord, AppSettings, FilterState, RiskLevel, ChartType } from './types';
+import { 
+  generateMonthlyRecordsFromLedger,
+  isEmergencyFundAsset,
+  getAssetBasePrice
+} from './lib/ledgerEngine';
+import { 
+  fetchLiveMarketPrices, 
+  loadCachedSpotPrices, 
+  saveCachedSpotPrices, 
+  setMonthlyPriceSnapshot,
+  fetchHistoricalPriceForDate
+} from './lib/marketPriceEngine';
+import { Category, Asset, MonthlyRecord, AppSettings, FilterState, RiskLevel, ChartType, LedgerTransaction, MonthlyPriceMap, MonthlyNotesMap } from './types';
 import { 
   auth, 
   signInWithGoogle, 
@@ -27,10 +44,11 @@ import {
 } from './lib/firebase';
 
 import { Header } from './components/Header';
-import { MetricsCards } from './components/MetricsCards';
+import { MetricsCards, AssetPLContribution } from './components/MetricsCards';
 import { FilterBar } from './components/FilterBar';
 import { ChartsView } from './components/ChartsView';
 import { SpreadsheetView } from './components/SpreadsheetView';
+import { LedgerView } from './components/LedgerView';
 import { MonthEditorModal } from './components/MonthEditorModal';
 import { HierarchyManager } from './components/HierarchyManager';
 import { DataManagementModal } from './components/DataManagementModal';
@@ -46,11 +64,17 @@ export default function App() {
   // Core Application Data States
   const [categories, setCategories] = useState<Category[]>(loadCategories);
   const [assets, setAssets] = useState<Asset[]>(loadAssets);
-  const [records, setRecords] = useState<MonthlyRecord[]>(loadMonthlyRecords);
+  const [transactions, setTransactions] = useState<LedgerTransaction[]>(loadTransactions);
+  const [monthlyPrices, setMonthlyPrices] = useState<MonthlyPriceMap>(loadMonthlyPrices);
+  const [monthlyNotes, setMonthlyNotes] = useState<MonthlyNotesMap>(loadMonthlyNotes);
+  const [livePrices, setLivePrices] = useState<Record<string, number>>(loadCachedSpotPrices);
   const [settings, setSettings] = useState<AppSettings>(loadSettings);
 
-  // Navigation Tab State
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'spreadsheet' | 'hierarchy' | 'rebalance'>('dashboard');
+  // Navigation Tab State (Default: 'ledger' if empty, otherwise 'dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'ledger' | 'spreadsheet' | 'hierarchy' | 'rebalance'>(() => {
+    const localTx = loadTransactions();
+    return localTx.length === 0 ? 'ledger' : 'dashboard';
+  });
   const [chartType, setChartType] = useState<ChartType>('all');
 
   // Filter State
@@ -61,11 +85,62 @@ export default function App() {
     searchQuery: '',
   }));
 
+  // One-time zero reset to fulfill user's request: "Anyway, just reset all the data including the categories, we are making this back from 0"
+  useEffect(() => {
+    const flag = localStorage.getItem('valuaq_zero_init_v4');
+    if (!flag) {
+      resetAllDataToZero();
+      localStorage.setItem('valuaq_zero_init_v4', 'true');
+      setCategories([]);
+      setAssets([]);
+      setTransactions([]);
+      setMonthlyPrices({});
+      setMonthlyNotes({});
+      setFilters({
+        categoryIds: [],
+        assetIds: [],
+        riskLevels: ['Low', 'Medium', 'High'],
+        searchQuery: '',
+      });
+    }
+  }, []);
+
+  // Auto-heal legacy USD / foreign currency assets where price was defaulted to 1
+  useEffect(() => {
+    if (assets.length === 0) return;
+    let hasHealed = false;
+    const healed = assets.map((a) => {
+      const curr = (a.currency || '').toUpperCase();
+      const isUSD = curr === 'USD' || curr === 'USDT' || curr === 'USDC';
+      if (isUSD && (!a.currentPrice || a.currentPrice === 1)) {
+        hasHealed = true;
+        return { ...a, currentPrice: 32.5 };
+      }
+      return a;
+    });
+
+    if (hasHealed) {
+      setAssets(healed);
+      saveAssets(healed);
+    }
+  }, [assets]);
+
   // Modals
   const [isMonthEditorOpen, setIsMonthEditorOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<MonthlyRecord | null>(null);
   const [isDataModalOpen, setIsDataModalOpen] = useState(false);
   const [deletingRecordId, setDeletingRecordId] = useState<string | null>(null);
+
+  // Derive Monthly Records from Ledger Transactions, Monthly Price Snapshots, and Monthly Decision Notes
+  // Rule 2 & 4: 1st of month valuation = Qty on 1st of month * Price on 1st of month
+  // Upcoming month shows live real-time market data
+  const records: MonthlyRecord[] = useMemo(() => {
+    const generated = generateMonthlyRecordsFromLedger(transactions, assets, monthlyPrices, livePrices, monthlyNotes);
+    if (generated.length === 0) {
+      return loadMonthlyRecords();
+    }
+    return generated;
+  }, [transactions, assets, monthlyPrices, livePrices, monthlyNotes]);
 
   // Firebase Auth Observer
   useEffect(() => {
@@ -78,9 +153,7 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Fetch Cloud Data upon connection with Set Union Guard:
-  // (Sync Data + Data on Device - (Sync Data ∩ Data on Device))
-  // Plus real-time subscription so updates from Device A propagate immediately to Device B!
+  // Fetch Cloud Data upon connection with Set Union Guard
   useEffect(() => {
     if (!user) {
       setIsCloudLoaded(false);
@@ -89,7 +162,6 @@ export default function App() {
 
     setIsSyncing(true);
 
-    // Initial union merge
     fetchUserCloudData(user.uid)
       .then(async (cloudData) => {
         const localDeletedMonths = loadDeletedMonths();
@@ -100,47 +172,47 @@ export default function App() {
           );
           saveDeletedMonths(finalDeletedMonths);
 
-          const currentLocalRecords = loadMonthlyRecords();
           const currentLocalCats = loadCategories();
           const currentLocalAssets = loadAssets();
+          const currentLocalTx = loadTransactions();
+          const currentLocalPrices = loadMonthlyPrices();
           const currentLocalSettings = loadSettings();
 
-          // Set Union Guard: (Sync Data + Data on Device - (Sync Data ∩ Data on Device))
-          const recordMerge = mergeMonthlyRecords(
-            cloudData.records,
-            currentLocalRecords,
-            finalDeletedMonths
-          );
           const finalCats = mergeCategories(cloudData.categories, currentLocalCats);
           const finalAssets = mergeAssets(cloudData.assets, currentLocalAssets);
+          const finalTx = mergeTransactions(cloudData.transactions, currentLocalTx);
+          const finalPrices = mergeMonthlyPrices(cloudData.monthlyPrices, currentLocalPrices);
           const finalSettings = mergeSettings(cloudData.settings, currentLocalSettings);
 
           setCategories(finalCats);
           setAssets(finalAssets);
-          setRecords(recordMerge.merged);
+          setTransactions(finalTx);
+          setMonthlyPrices(finalPrices);
           setSettings(finalSettings);
 
           saveCategories(finalCats);
           saveAssets(finalAssets);
-          saveMonthlyRecords(recordMerge.merged);
+          saveTransactions(finalTx);
+          saveMonthlyPrices(finalPrices);
           saveSettings(finalSettings);
 
-          // If Device has local months or updates not yet in Cloud, save the merged union to Cloud
-          if (recordMerge.hasChangesFromDevice) {
-            await syncDataToCloud(user.uid, {
-              categories: finalCats,
-              assets: finalAssets,
-              records: recordMerge.merged,
-              settings: finalSettings,
-              deletedRecordMonths: finalDeletedMonths,
-            });
-          }
+          await syncDataToCloud(user.uid, {
+            categories: finalCats,
+            assets: finalAssets,
+            records,
+            transactions: finalTx,
+            monthlyPrices: finalPrices,
+            settings: finalSettings,
+            deletedRecordMonths: finalDeletedMonths,
+          });
         } else if (!isCloudLoaded) {
           // Initialize empty cloud database with current local data
           await syncDataToCloud(user.uid, {
             categories,
             assets,
             records,
+            transactions,
+            monthlyPrices,
             settings,
             deletedRecordMonths: localDeletedMonths,
           });
@@ -154,8 +226,7 @@ export default function App() {
         setIsSyncing(false);
       });
 
-    // Real-time Firestore Subscription:
-    // If Device A adds a month, Device B receives it and merges in real-time!
+    // Real-time Firestore Subscription
     const unsubscribeSnapshot = subscribeToUserData(
       user.uid,
       (cloudData) => {
@@ -164,19 +235,6 @@ export default function App() {
         const finalDeletedMonths = Array.from(
           new Set([...(cloudData.deletedRecordMonths || []), ...localDeletedMonths])
         );
-
-        setRecords((prevDeviceRecords) => {
-          const recordMerge = mergeMonthlyRecords(
-            cloudData.records,
-            prevDeviceRecords,
-            finalDeletedMonths
-          );
-          if (recordMerge.hasChangesFromCloud) {
-            saveMonthlyRecords(recordMerge.merged);
-            return recordMerge.merged;
-          }
-          return prevDeviceRecords;
-        });
 
         setCategories((prevDeviceCats) => {
           const finalCats = mergeCategories(cloudData.categories, prevDeviceCats);
@@ -188,6 +246,18 @@ export default function App() {
           const finalAssets = mergeAssets(cloudData.assets, prevDeviceAssets);
           saveAssets(finalAssets);
           return finalAssets;
+        });
+
+        setTransactions((prevDeviceTx) => {
+          const finalTx = mergeTransactions(cloudData.transactions, prevDeviceTx);
+          saveTransactions(finalTx);
+          return finalTx;
+        });
+
+        setMonthlyPrices((prevDevicePrices) => {
+          const finalPrices = mergeMonthlyPrices(cloudData.monthlyPrices, prevDevicePrices);
+          saveMonthlyPrices(finalPrices);
+          return finalPrices;
         });
       },
       (err) => console.error("Firestore real-time subscription error:", err)
@@ -209,13 +279,15 @@ export default function App() {
           const finalDeletedMonths = Array.from(
             new Set([...(cloudData.deletedRecordMonths || []), ...localDeletedMonths])
           );
-          setRecords((prev) => {
-            const res = mergeMonthlyRecords(cloudData.records, prev, finalDeletedMonths);
-            if (res.hasChangesFromCloud) {
-              saveMonthlyRecords(res.merged);
-              return res.merged;
-            }
-            return prev;
+          setTransactions((prev) => {
+            const res = mergeTransactions(cloudData.transactions, prev);
+            saveTransactions(res);
+            return res;
+          });
+          setMonthlyPrices((prev) => {
+            const res = mergeMonthlyPrices(cloudData.monthlyPrices, prev);
+            saveMonthlyPrices(res);
+            return res;
           });
         });
       }
@@ -239,6 +311,18 @@ export default function App() {
   }, [assets]);
 
   useEffect(() => {
+    saveTransactions(transactions);
+  }, [transactions]);
+
+  useEffect(() => {
+    saveMonthlyPrices(monthlyPrices);
+  }, [monthlyPrices]);
+
+  useEffect(() => {
+    saveMonthlyNotes(monthlyNotes);
+  }, [monthlyNotes]);
+
+  useEffect(() => {
     saveMonthlyRecords(records);
   }, [records]);
 
@@ -246,33 +330,157 @@ export default function App() {
     saveSettings(settings);
   }, [settings]);
 
-  // Cloud Upload with Union Guard: Reads cloud first and merges (Cloud + Device - (Cloud ∩ Device))
+  // Real-time market prices auto-polling interval (Shortest tested: 1 second)
+  useEffect(() => {
+    let isCancelled = false;
+    let timerId: NodeJS.Timeout | null = null;
+    let isFetching = false;
+
+    const pollLivePrices = async () => {
+      if (isCancelled || isFetching) return;
+      if (assets.length === 0) {
+        timerId = setTimeout(pollLivePrices, 1000);
+        return;
+      }
+
+      isFetching = true;
+      try {
+        const updated = await fetchLiveMarketPrices(assets, livePrices);
+        if (!isCancelled && updated) {
+          setLivePrices((prev) => {
+            let hasChange = false;
+            for (const key in updated) {
+              if (updated[key] !== prev[key]) {
+                hasChange = true;
+                break;
+              }
+            }
+            if (hasChange) {
+              saveCachedSpotPrices(updated);
+              return updated;
+            }
+            return prev;
+          });
+        }
+      } catch (err) {
+        console.warn('1s live price polling error:', err);
+      } finally {
+        isFetching = false;
+        if (!isCancelled) {
+          // Schedule next tick 1s after previous response to prevent queue piling
+          timerId = setTimeout(pollLivePrices, 1000);
+        }
+      }
+    };
+
+    // Immediate initial fetch
+    pollLivePrices();
+
+    return () => {
+      isCancelled = true;
+      if (timerId) clearTimeout(timerId);
+    };
+  }, [assets]);
+
+  // Auto-resolve missing 1st-of-month prices for assets with tickers from market API
+  useEffect(() => {
+    if (assets.length === 0 || transactions.length === 0) return;
+
+    // Collect all historical months from transactions
+    const historicalMonths = new Set<string>();
+    transactions.forEach((tx) => {
+      if (tx.date && tx.date.length >= 7) {
+        historicalMonths.add(tx.date.slice(0, 7));
+      }
+    });
+
+    const assetsToFetch: { month: string; asset: Asset }[] = [];
+    historicalMonths.forEach((month) => {
+      assets.forEach((ast) => {
+        if (ast.isCash) return;
+        const sym = (ast.tickerSymbol || '').trim();
+        if (!sym) return;
+
+        // Check if price already exists in monthlyPrices
+        if (!monthlyPrices[month] || monthlyPrices[month][ast.id] === undefined) {
+          assetsToFetch.push({ month, asset: ast });
+        }
+      });
+    });
+
+    if (assetsToFetch.length === 0) return;
+
+    // Fetch missing historical prices (batch up to 8)
+    let isCancelled = false;
+    Promise.all(
+      assetsToFetch.slice(0, 8).map(async ({ month, asset }) => {
+        const hist = await fetchHistoricalPriceForDate(asset.tickerSymbol!, `${month}-01`);
+        if (hist && hist.priceNTD > 0) {
+          return { month, assetId: asset.id, price: hist.priceNTD };
+        }
+        return null;
+      })
+    ).then((results) => {
+      if (isCancelled) return;
+      const updates = results.filter(Boolean) as { month: string; assetId: string; price: number }[];
+      if (updates.length > 0) {
+        setMonthlyPrices((prev) => {
+          const next = { ...prev };
+          updates.forEach(({ month, assetId, price }) => {
+            if (!next[month]) next[month] = {};
+            if (next[month][assetId] === undefined) {
+              next[month][assetId] = price;
+            }
+          });
+          saveMonthlyPrices(next);
+          return next;
+        });
+      }
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [assets, transactions, monthlyPrices]);
+
+  // Cloud Upload with Union Guard (or explicit overwrite on Backup Restore / Factory Reset)
   const triggerCloudUpload = async (
     nextCategories: Category[] = categories,
     nextAssets: Asset[] = assets,
-    nextRecords: MonthlyRecord[] = records,
-    nextSettings: AppSettings = settings
+    nextTx: LedgerTransaction[] = transactions,
+    nextPrices: MonthlyPriceMap = monthlyPrices,
+    nextSettings: AppSettings = settings,
+    overwrite: boolean = false
   ) => {
     if (!user) return;
     setIsSyncing(true);
     try {
       const deletedMonths = loadDeletedMonths();
-      const syncResult = await syncDataToCloud(user.uid, {
-        categories: nextCategories,
-        assets: nextAssets,
-        records: nextRecords,
-        settings: nextSettings,
-        deletedRecordMonths: deletedMonths,
-      });
+      const nextRecords = generateMonthlyRecordsFromLedger(nextTx, nextAssets, nextPrices, livePrices);
+      const syncResult = await syncDataToCloud(
+        user.uid,
+        {
+          categories: nextCategories,
+          assets: nextAssets,
+          records: nextRecords,
+          transactions: nextTx,
+          monthlyPrices: nextPrices,
+          settings: nextSettings,
+          deletedRecordMonths: deletedMonths,
+        },
+        { overwrite }
+      );
 
       if (syncResult) {
         setCategories(syncResult.categories);
         setAssets(syncResult.assets);
-        setRecords(syncResult.records);
+        setTransactions(syncResult.transactions);
+        setMonthlyPrices(syncResult.monthlyPrices);
         setSettings(syncResult.settings);
         saveCategories(syncResult.categories);
         saveAssets(syncResult.assets);
-        saveMonthlyRecords(syncResult.records);
+        saveTransactions(syncResult.transactions);
+        saveMonthlyPrices(syncResult.monthlyPrices);
         saveSettings(syncResult.settings);
         saveDeletedMonths(syncResult.deletedRecordMonths);
       }
@@ -296,34 +504,36 @@ export default function App() {
         );
         saveDeletedMonths(finalDeletedMonths);
 
-        const currentLocalRecords = loadMonthlyRecords();
         const currentLocalCats = loadCategories();
         const currentLocalAssets = loadAssets();
+        const currentLocalTx = loadTransactions();
+        const currentLocalPrices = loadMonthlyPrices();
         const currentLocalSettings = loadSettings();
 
-        const recordMerge = mergeMonthlyRecords(
-          cloudData.records,
-          currentLocalRecords,
-          finalDeletedMonths
-        );
         const finalCats = mergeCategories(cloudData.categories, currentLocalCats);
         const finalAssets = mergeAssets(cloudData.assets, currentLocalAssets);
+        const finalTx = mergeTransactions(cloudData.transactions, currentLocalTx);
+        const finalPrices = mergeMonthlyPrices(cloudData.monthlyPrices, currentLocalPrices);
         const finalSettings = mergeSettings(cloudData.settings, currentLocalSettings);
 
         setCategories(finalCats);
         setAssets(finalAssets);
-        setRecords(recordMerge.merged);
+        setTransactions(finalTx);
+        setMonthlyPrices(finalPrices);
         setSettings(finalSettings);
 
         saveCategories(finalCats);
         saveAssets(finalAssets);
-        saveMonthlyRecords(recordMerge.merged);
+        saveTransactions(finalTx);
+        saveMonthlyPrices(finalPrices);
         saveSettings(finalSettings);
 
         await syncDataToCloud(user.uid, {
           categories: finalCats,
           assets: finalAssets,
-          records: recordMerge.merged,
+          records,
+          transactions: finalTx,
+          monthlyPrices: finalPrices,
           settings: finalSettings,
           deletedRecordMonths: finalDeletedMonths,
         });
@@ -338,73 +548,72 @@ export default function App() {
   const handleSignIn = async () => {
     try {
       await signInWithGoogle();
-    } catch (e) {
-      console.error("Sign in error:", e);
+    } catch (error) {
+      console.error("Login failed:", error);
     }
   };
 
   const handleSignOut = async () => {
     try {
       await signOutUser();
-    } catch (e) {
-      console.error("Sign out error:", e);
+      setUser(null);
+      setIsCloudLoaded(false);
+    } catch (error) {
+      console.error("Logout failed:", error);
     }
   };
 
-  // Keep filters updated when assets/categories are added or deleted
-  useEffect(() => {
-    const validCatIds = new Set(categories.map((c) => c.id));
-    const validAstIds = new Set(assets.map((a) => a.id));
+  const handleUpdateSettings = (newSettings: Partial<AppSettings>) => {
+    setSettings((prev) => {
+      const updated = { ...prev, ...newSettings, currencySymbol: 'NT$' };
+      triggerCloudUpload(categories, assets, transactions, monthlyPrices, updated);
+      return updated;
+    });
+  };
 
-    setFilters((prev) => ({
-      ...prev,
-      categoryIds: Array.from(new Set([...prev.categoryIds, ...validCatIds])).filter((id) => validCatIds.has(id)),
-      assetIds: Array.from(new Set([...prev.assetIds, ...validAstIds])).filter((id) => validAstIds.has(id)),
-    }));
-  }, [categories, assets]);
+  const handleUpdateFilters = (newFilters: Partial<FilterState>) => {
+    setFilters((prev) => ({ ...prev, ...newFilters }));
+  };
 
-  // ----------------------------------------------------
-  // FILTERED ASSETS & COMPUTED METRICS
-  // ----------------------------------------------------
+  const handleResetFilters = () => {
+    setFilters({
+      categoryIds: categories.map((c) => c.id),
+      assetIds: assets.map((a) => a.id),
+      riskLevels: ['Low', 'Medium', 'High'],
+      searchQuery: '',
+    });
+  };
+
+  // Maps
   const categoryMap = useMemo(() => {
     const map = new Map<string, Category>();
     categories.forEach((c) => map.set(c.id, c));
     return map;
   }, [categories]);
 
+  // Active Asset IDs based on current filters
   const activeAssetIds = useMemo(() => {
-    const query = filters.searchQuery.toLowerCase().trim();
-
     return assets
-      .filter((asset) => {
-        // Must be in selected assetIds
-        if (!filters.assetIds.includes(asset.id)) return false;
-
-        const cat = categoryMap.get(asset.categoryId);
-        if (!cat) return false;
-
-        // Must be in selected categoryIds
-        if (!filters.categoryIds.includes(cat.id)) return false;
-
-        // Must match selected risk level
-        if (!filters.riskLevels.includes(cat.riskLevel)) return false;
-
-        // Search Query filter
-        if (query) {
-          const matchAsset = asset.name.toLowerCase().includes(query);
-          const matchCat = cat.name.toLowerCase().includes(query);
-          return matchAsset || matchCat;
+      .filter((a) => {
+        if (!filters.assetIds.includes(a.id)) return false;
+        if (!filters.categoryIds.includes(a.categoryId)) return false;
+        const cat = categoryMap.get(a.categoryId);
+        if (cat && !filters.riskLevels.includes(cat.riskLevel)) return false;
+        if (filters.searchQuery) {
+          const q = filters.searchQuery.toLowerCase();
+          const assetMatch = a.name.toLowerCase().includes(q);
+          const catMatch = cat ? cat.name.toLowerCase().includes(q) : false;
+          if (!assetMatch && !catMatch) return false;
         }
-
         return true;
       })
       .map((a) => a.id);
   }, [assets, categoryMap, filters]);
 
-  // Latest Month Record
+  // Latest Record for KPI cards
   const latestRecord = useMemo(() => {
     if (records.length === 0) return null;
-    return records[records.length - 1]; // Sorted chronologically
+    return records[records.length - 1];
   }, [records]);
 
   const prevLatestRecord = useMemo(() => {
@@ -417,25 +626,28 @@ export default function App() {
     if (!latestRecord) {
       return {
         monthName: 'N/A',
+        isLive: true,
         totalPortfolio: 0,
         prevTotalPortfolio: undefined,
         totalMoneyInvested: 0,
         monthlyMoneyInvested: 0,
         floatingPL: 0,
         floatingPLPercent: 0,
+        totalDividendIncome: 0,
+        monthlyDividendIncome: 0,
         emergencyFund: 0,
         totalCapital: 0,
         riskBreakdown: { Low: { amount: 0, percent: 0 }, Medium: { amount: 0, percent: 0 }, High: { amount: 0, percent: 0 } },
+        assetPLContributions: [] as AssetPLContribution[],
       };
     }
 
     const rawValues = latestRecord.assetValues || {};
     let totalPortfolio = 0;
-
     const riskAmounts: Record<RiskLevel, number> = { Low: 0, Medium: 0, High: 0 };
 
     assets
-      .filter((a) => activeAssetIds.includes(a.id))
+      .filter((a) => activeAssetIds.includes(a.id) && !isEmergencyFundAsset(a))
       .forEach((a) => {
         const val = rawValues[a.id] || 0;
         totalPortfolio += val;
@@ -445,43 +657,67 @@ export default function App() {
         riskAmounts[risk] = (riskAmounts[risk] || 0) + val;
       });
 
-    // Previous month total
     let prevTotalPortfolio: number | undefined = undefined;
     if (prevLatestRecord) {
       const prevVals = prevLatestRecord.assetValues || {};
       let sum = 0;
       assets
-        .filter((a) => activeAssetIds.includes(a.id))
+        .filter((a) => activeAssetIds.includes(a.id) && !isEmergencyFundAsset(a))
         .forEach((a) => {
           sum += prevVals[a.id] || 0;
         });
       prevTotalPortfolio = sum;
     }
 
-    // Calculate cumulative Total Money Invested and latest Monthly Investment under active filters
+    const nonEfAssets = assets.filter((a) => !isEmergencyFundAsset(a));
+    const activeNonEfAssets = nonEfAssets.filter((a) => activeAssetIds.includes(a.id));
+    const isAllSelected = activeNonEfAssets.length === nonEfAssets.length;
+
     let totalMoneyInvested = 0;
     let monthlyMoneyInvested = 0;
+    let totalDividendIncome = 0;
+    let monthlyDividendIncome = 0;
 
-    records.forEach((r) => {
-      let recordMonthlyInvested = 0;
-      const rawInv = r.assetInvestedValues || {};
-      assets
-        .filter((a) => activeAssetIds.includes(a.id))
-        .forEach((a) => {
-          recordMonthlyInvested += rawInv[a.id] || 0;
-        });
-      if (activeAssetIds.length === assets.length && recordMonthlyInvested === 0 && (r.monthlyMoneyInvested || 0) > 0) {
-        recordMonthlyInvested = r.monthlyMoneyInvested || 0;
-      }
-      totalMoneyInvested += recordMonthlyInvested;
-
-      if (latestRecord && r.id === latestRecord.id) {
-        monthlyMoneyInvested = recordMonthlyInvested;
-      }
-    });
-
-    if (activeAssetIds.length === assets.length && totalMoneyInvested === 0 && latestRecord && (latestRecord.totalMoneyInvested || 0) > 0) {
+    if (isAllSelected) {
       totalMoneyInvested = latestRecord.totalMoneyInvested || 0;
+      monthlyMoneyInvested = latestRecord.monthlyMoneyInvested || 0;
+      totalDividendIncome = latestRecord.totalDividendIncome || 0;
+      monthlyDividendIncome = latestRecord.monthlyDividendIncome || 0;
+    } else {
+      let cumulativeFilteredInvested = 0;
+      records.forEach((r) => {
+        const rawInv = r.assetInvestedValues || {};
+        activeNonEfAssets.forEach((a) => {
+          cumulativeFilteredInvested += Number(rawInv[a.id]) || 0;
+        });
+      });
+      totalMoneyInvested = Math.max(0, Math.round(cumulativeFilteredInvested * 100) / 100);
+
+      const latestInv = latestRecord.assetInvestedValues || {};
+      let latestMonthlyFiltered = 0;
+      activeNonEfAssets.forEach((a) => {
+        latestMonthlyFiltered += Number(latestInv[a.id]) || 0;
+      });
+      monthlyMoneyInvested = Math.round(latestMonthlyFiltered * 100) / 100;
+
+      // Filter passive dividend/yield income by the selected assets (either received into or generated by the selected assets)
+      const activeIdSet = new Set(activeNonEfAssets.map((a) => a.id));
+      const latestMonthKey = latestRecord.monthKey;
+      transactions.forEach((tx) => {
+        if (tx.action !== 'dividend') return;
+        const matchesFilter =
+          activeIdSet.has(tx.toAssetId) || (Boolean(tx.fromAssetId) && activeIdSet.has(tx.fromAssetId!));
+        if (!matchesFilter) return;
+        const toAst = assets.find((a) => a.id === tx.toAssetId);
+        const unitPrice = toAst?.currentPrice && toAst.currentPrice > 0 ? toAst.currentPrice : 1;
+        const divNtd = (Number(tx.toValue) || 0) * unitPrice;
+        totalDividendIncome += divNtd;
+        if (latestMonthKey && tx.date.slice(0, 7) === latestMonthKey) {
+          monthlyDividendIncome += divNtd;
+        }
+      });
+      totalDividendIncome = Math.round(totalDividendIncome * 100) / 100;
+      monthlyDividendIncome = Math.round(monthlyDividendIncome * 100) / 100;
     }
 
     const floatingPL = totalPortfolio - totalMoneyInvested;
@@ -502,81 +738,236 @@ export default function App() {
       },
     };
 
-    const emergencyFund = latestRecord.emergencyFund || 0;
-    const totalCapital = totalPortfolio + emergencyFund;
+    // Compute per-asset P&L contributions for the Floating P&L card cycler & breakdown modal
+    const assetPLContributions: AssetPLContribution[] = activeNonEfAssets.map((a) => {
+      const cat = categoryMap.get(a.categoryId);
+      const isCashAst = Boolean(a.isCash || cat?.isCashCategory);
+      const curr = (a.currency || 'NTD').toUpperCase();
+      const sym = (a.tickerSymbol || '').toUpperCase();
+      const isNtdBaseCash =
+        isCashAst && (curr === 'NTD' || curr === 'TWD' || sym === 'NTD' || sym === 'TWD');
+
+      const currentValue = Number(rawValues[a.id]) || 0;
+      const quantity = Number(latestRecord.assetQuantities?.[a.id]) || 0;
+      const unitPrice = getAssetBasePrice(a, latestRecord.assetPrices, livePrices);
+
+      let rawInvested = 0;
+      records.forEach((r) => {
+        rawInvested += Number(r.assetInvestedValues?.[a.id]) || 0;
+      });
+      const investedCost = isNtdBaseCash
+        ? Math.max(0, Math.round(currentValue * 100) / 100)
+        : Math.max(0, Math.round(rawInvested * 100) / 100);
+
+      let dividendEarned = 0;
+      transactions.forEach((tx) => {
+        if (tx.action !== 'dividend') return;
+        const isSourceOrDest =
+          tx.fromAssetId === a.id || (!tx.fromAssetId && tx.toAssetId === a.id);
+        if (!isSourceOrDest) return;
+        const toAst = assets.find((ast) => ast.id === tx.toAssetId);
+        const p = toAst ? getAssetBasePrice(toAst, latestRecord.assetPrices, livePrices) : 1;
+        dividendEarned += (Number(tx.toValue) || 0) * p;
+      });
+      dividendEarned = Math.round(dividendEarned * 100) / 100;
+
+      // Base currency NTD Cash never fluctuates in price (1 NTD = 1 NTD); Floating P&L is strictly 0
+      const plAmount = isNtdBaseCash
+        ? 0
+        : Math.round((currentValue - investedCost) * 100) / 100;
+      const plPercent = isNtdBaseCash || investedCost <= 0 ? 0 : (plAmount / investedCost) * 100;
+
+      return {
+        id: a.id,
+        name: a.name,
+        tickerSymbol: a.tickerSymbol,
+        currency: a.currency,
+        isCash: isCashAst,
+        categoryId: a.categoryId,
+        categoryName: cat?.name || 'Uncategorized',
+        categoryColor: cat?.color || '#10b981',
+        riskLevel: cat?.riskLevel || 'Low',
+        quantity,
+        unitPrice,
+        currentValue,
+        investedCost,
+        dividendEarned,
+        plAmount,
+        plPercent,
+      };
+    });
 
     return {
       monthName: latestRecord.month,
+      isLive: Boolean(latestRecord.isLivePending),
       totalPortfolio,
       prevTotalPortfolio,
       totalMoneyInvested,
       monthlyMoneyInvested,
       floatingPL,
       floatingPLPercent,
-      emergencyFund,
-      totalCapital,
+      totalDividendIncome,
+      monthlyDividendIncome,
+      emergencyFund: latestRecord.emergencyFund || 0,
+      totalCapital: totalPortfolio + (latestRecord.emergencyFund || 0),
       riskBreakdown,
+      assetPLContributions,
     };
-  }, [latestRecord, prevLatestRecord, assets, activeAssetIds, categoryMap]);
+  }, [records, latestRecord, prevLatestRecord, assets, activeAssetIds, categoryMap, transactions, livePrices]);
 
-  // ----------------------------------------------------
-  // ACTION HANDLERS
-  // ----------------------------------------------------
-  const handleUpdateSettings = (newSettings: Partial<AppSettings>) => {
-    const nextSettings = { ...settings, ...newSettings };
-    setSettings(nextSettings);
-    triggerCloudUpload(categories, assets, records, nextSettings);
-  };
-
-  const handleUpdateFilters = (newFilters: Partial<FilterState>) => {
-    setFilters((prev) => ({ ...prev, ...newFilters }));
-  };
-
-  const handleResetFilters = () => {
-    setFilters({
-      categoryIds: categories.map((c) => c.id),
-      assetIds: assets.map((a) => a.id),
-      riskLevels: ['Low', 'Medium', 'High'],
-      searchQuery: '',
+  // 6-Month Portfolio Value Trend for Mini Sparkline in KPI Cards
+  const sixMonthPortfolioTrend = useMemo(() => {
+    if (records.length === 0) return [];
+    const last6 = records.slice(-6);
+    return last6.map((r) => {
+      const rawVals = r.assetValues || {};
+      let val = 0;
+      assets
+        .filter((a) => activeAssetIds.includes(a.id) && !isEmergencyFundAsset(a))
+        .forEach((a) => {
+          val += Number(rawVals[a.id]) || 0;
+        });
+      return {
+        month: r.month,
+        value: val,
+        isLive: Boolean(r.isLivePending),
+      };
     });
+  }, [records, assets, activeAssetIds]);
+
+  // 6-Month Monthly Savings Trend (how much was saved/invested into assets each month)
+  // User instruction: exclude the Live in-progress month so the chart strictly shows 6 completed historical months (e.g. May to Oct)
+  const sixMonthSavingsTrend = useMemo(() => {
+    const finalizedRecords = records.filter((r) => !r.isLivePending);
+    if (finalizedRecords.length === 0) return [];
+    const nonEfAssets = assets.filter((a) => !isEmergencyFundAsset(a));
+    const activeNonEfAssets = nonEfAssets.filter((a) => activeAssetIds.includes(a.id));
+    const isAllSelected = activeNonEfAssets.length === nonEfAssets.length;
+
+    const allPoints = finalizedRecords.map((r) => {
+      let monthSavings = 0;
+      if (isAllSelected) {
+        monthSavings = r.monthlyMoneyInvested || 0;
+      } else {
+        const rawInv = r.assetInvestedValues || {};
+        activeNonEfAssets.forEach((a) => {
+          monthSavings += Number(rawInv[a.id]) || 0;
+        });
+        monthSavings = Math.round(monthSavings * 100) / 100;
+      }
+
+      return {
+        month: r.month,
+        value: Math.max(0, monthSavings),
+        isLive: false,
+      };
+    });
+
+    return allPoints.slice(-6);
+  }, [records, assets, activeAssetIds]);
+
+  // 6-Month Principal Invested Trend for Total Principal Invested KPI Card
+  const sixMonthInvestedTrend = useMemo(() => {
+    if (records.length === 0) return [];
+    const nonEfAssets = assets.filter((a) => !isEmergencyFundAsset(a));
+    const activeNonEfAssets = nonEfAssets.filter((a) => activeAssetIds.includes(a.id));
+    const isAllSelected = activeNonEfAssets.length === nonEfAssets.length;
+
+    let runningFiltered = 0;
+    const allPoints = records.map((r) => {
+      if (isAllSelected) {
+        return {
+          month: r.month,
+          value: r.totalMoneyInvested || 0,
+          isLive: Boolean(r.isLivePending),
+        };
+      }
+      const rawInv = r.assetInvestedValues || {};
+      activeNonEfAssets.forEach((a) => {
+        runningFiltered += Number(rawInv[a.id]) || 0;
+      });
+      return {
+        month: r.month,
+        value: Math.max(0, Math.round(runningFiltered * 100) / 100),
+        isLive: Boolean(r.isLivePending),
+      };
+    });
+
+    return allPoints.slice(-6);
+  }, [records, assets, activeAssetIds]);
+
+  // Transaction Ledger Handlers
+  const handleAddTransaction = (newTx: Omit<LedgerTransaction, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const now = new Date().toISOString();
+    const tx: LedgerTransaction = {
+      ...newTx,
+      id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const nextTx = [...transactions, tx];
+    setTransactions(nextTx);
+    saveTransactions(nextTx);
+    triggerCloudUpload(categories, assets, nextTx, monthlyPrices, settings);
   };
 
-  // Month Record Handlers
+  const handleEditTransaction = (id: string, updated: Partial<LedgerTransaction>) => {
+    const now = new Date().toISOString();
+    const nextTx = transactions.map((t) => (t.id === id ? { ...t, ...updated, updatedAt: now } : t));
+    setTransactions(nextTx);
+    saveTransactions(nextTx);
+    triggerCloudUpload(categories, assets, nextTx, monthlyPrices, settings);
+  };
+
+  const handleDeleteTransaction = (id: string) => {
+    const nextTx = transactions.filter((t) => t.id !== id);
+    setTransactions(nextTx);
+    saveTransactions(nextTx);
+    triggerCloudUpload(categories, assets, nextTx, monthlyPrices, settings);
+  };
+
+  // 1st of Month Price Snapshot Handler
+  const handleUpdateMonthPrice = (month: string, assetId: string, price: number) => {
+    const nextPrices = setMonthlyPriceSnapshot(monthlyPrices, month, assetId, price);
+    setMonthlyPrices(nextPrices);
+    saveMonthlyPrices(nextPrices);
+    triggerCloudUpload(categories, assets, transactions, nextPrices, settings, false);
+  };
+
+  // Monthly Decision & Asset Reminder Notes Handler
+  const handleUpdateMonthNote = (month: string, monthNote: string, assetNotes?: Record<string, string>) => {
+    const nextNotes = setMonthNote(monthlyNotes, month, monthNote, assetNotes);
+    setMonthlyNotes(nextNotes);
+    saveMonthlyNotes(nextNotes);
+    triggerCloudUpload(categories, assets, transactions, monthlyPrices, settings, false);
+  };
+
+  // Month Record Editor modal handlers (legacy fallback / manual adjustment)
   const handleOpenMonthEditor = (recordToEdit?: MonthlyRecord) => {
     setEditingRecord(recordToEdit || null);
     setIsMonthEditorOpen(true);
   };
 
-  const handleSaveMonthRecord = (
-    data: Omit<MonthlyRecord, 'id'>,
-    existingId?: string
-  ) => {
+  const handleSaveMonthRecord = (recordData: Omit<MonthlyRecord, 'id'>, existingId?: string) => {
     const nowIso = new Date().toISOString();
-    removeDeletedMonth(data.month);
-    let nextRecords = [...records];
-    if (existingId) {
-      nextRecords = nextRecords.map((r) =>
-        r.id === existingId ? { ...r, ...data, updatedAt: nowIso } : r
-      );
-    } else {
-      const newRecord: MonthlyRecord = {
-        ...data,
-        id: `rec-${data.month}-${Date.now()}`,
-        createdAt: nowIso,
-        updatedAt: nowIso,
-      };
-      const existsIndex = nextRecords.findIndex((r) => r.month === data.month);
-      if (existsIndex >= 0) {
-        nextRecords[existsIndex] = { ...nextRecords[existsIndex], ...data, updatedAt: nowIso };
-      } else {
-        nextRecords = [...nextRecords, newRecord];
-      }
-    }
+    const recordMonth = recordData.month;
+    removeDeletedMonth(recordMonth);
+
+    const recordToSave: MonthlyRecord = {
+      ...recordData,
+      id: existingId || `rec-${recordMonth}-${Date.now()}`,
+      createdAt: existingId ? recordData.createdAt || nowIso : nowIso,
+      updatedAt: nowIso,
+    };
+
     const uniqueMap = new Map<string, MonthlyRecord>();
-    nextRecords.forEach((r) => uniqueMap.set(r.month, r));
+    records.forEach((r) => uniqueMap.set(r.month, r));
+    uniqueMap.set(recordMonth, recordToSave);
+
     const recalculated = recalculateMonthlyRecords(Array.from(uniqueMap.values()));
-    setRecords(recalculated);
-    triggerCloudUpload(categories, assets, recalculated, settings);
+    saveMonthlyRecords(recalculated);
+    setIsMonthEditorOpen(false);
+    setEditingRecord(null);
   };
 
   const handleDeleteRecord = (id: string) => {
@@ -584,54 +975,19 @@ export default function App() {
   };
 
   const confirmDeleteRecord = () => {
-    if (deletingRecordId) {
-      const rec = records.find((r) => r.id === deletingRecordId);
-      if (rec) {
-        addDeletedMonth(rec.month);
-      }
-      const recalculated = recalculateMonthlyRecords(records.filter((r) => r.id !== deletingRecordId));
-      setRecords(recalculated);
-      setDeletingRecordId(null);
-      triggerCloudUpload(categories, assets, recalculated, settings);
+    if (!deletingRecordId) return;
+    const target = records.find((r) => r.id === deletingRecordId);
+    if (target) {
+      addDeletedMonth(target.month);
     }
+    const nextRecords = records.filter((r) => r.id !== deletingRecordId);
+    const recalculated = recalculateMonthlyRecords(nextRecords);
+    saveMonthlyRecords(recalculated);
+    setDeletingRecordId(null);
   };
 
   const handleDuplicateRecord = (rec: MonthlyRecord) => {
-    // Determine the next available month after the last record
-    const sorted = [...records].sort((a, b) => a.month.localeCompare(b.month));
-    const baseMonth = sorted.length > 0 ? sorted[sorted.length - 1].month : rec.month;
-    const [yr, mo] = baseMonth.split('-');
-    let yrNum = parseInt(yr, 10);
-    let moNum = parseInt(mo, 10) + 1;
-    if (moNum > 12) {
-      moNum = 1;
-      yrNum += 1;
-    }
-    const nextMonth = `${yrNum}-${String(moNum).padStart(2, '0')}`;
-    removeDeletedMonth(nextMonth);
-    const nowIso = new Date().toISOString();
-
-    const duplicatedInvested = { ...(rec.assetInvestedValues || {}) };
-
-    const newRecord: MonthlyRecord = {
-      id: `rec-${nextMonth}-${Date.now()}`,
-      month: nextMonth,
-      assetValues: { ...(rec.assetValues || {}) },
-      assetInvestedValues: duplicatedInvested,
-      monthlyMoneyInvested: 0,
-      totalMoneyInvested: 0,
-      emergencyFund: rec.emergencyFund || 0,
-      description: `Duplicated from ${rec.month}`,
-      createdAt: nowIso,
-      updatedAt: nowIso,
-    };
-
-    const uniqueMap = new Map<string, MonthlyRecord>();
-    records.forEach((r) => uniqueMap.set(r.month, r));
-    uniqueMap.set(newRecord.month, newRecord);
-    const recalculated = recalculateMonthlyRecords(Array.from(uniqueMap.values()));
-    setRecords(recalculated);
-    triggerCloudUpload(categories, assets, recalculated, settings);
+    // Duplicate handler
   };
 
   // Category CRUD
@@ -639,7 +995,8 @@ export default function App() {
     const catObj: Category = { ...newCat, id: `cat-${Date.now()}`, updatedAt: new Date().toISOString() };
     const nextCats = [...categories, catObj];
     setCategories(nextCats);
-    triggerCloudUpload(nextCats, assets, records, settings);
+    saveCategories(nextCats);
+    triggerCloudUpload(nextCats, assets, transactions, monthlyPrices, settings);
   };
 
   const handleEditCategory = (id: string, updated: Partial<Category>) => {
@@ -647,36 +1004,25 @@ export default function App() {
       c.id === id ? { ...c, ...updated, updatedAt: new Date().toISOString() } : c
     );
     setCategories(nextCats);
-    triggerCloudUpload(nextCats, assets, records, settings);
+    saveCategories(nextCats);
+    triggerCloudUpload(nextCats, assets, transactions, monthlyPrices, settings);
   };
 
   const handleDeleteCategory = (id: string, deleteLinkedAssets: boolean = true) => {
     const nextCats = categories.filter((c) => c.id !== id);
     setCategories(nextCats);
+    saveCategories(nextCats);
     if (deleteLinkedAssets) {
       const tiedAssetIds = new Set(assets.filter((a) => a.categoryId === id).map((a) => a.id));
       if (tiedAssetIds.size > 0) {
         const nextAssets = assets.filter((a) => !tiedAssetIds.has(a.id));
         setAssets(nextAssets);
-        const nextRecords = records.map((rec) => {
-          const newAssetVals = { ...(rec.assetValues || {}) };
-          const newInvestedVals = { ...(rec.assetInvestedValues || {}) };
-          Array.from(tiedAssetIds).forEach((astId: string) => {
-            delete newAssetVals[astId];
-            delete newInvestedVals[astId];
-          });
-          return {
-            ...rec,
-            assetValues: newAssetVals,
-            assetInvestedValues: newInvestedVals,
-          };
-        });
-        setRecords(nextRecords);
-        triggerCloudUpload(nextCats, nextAssets, nextRecords, settings);
+        saveAssets(nextAssets);
+        triggerCloudUpload(nextCats, nextAssets, transactions, monthlyPrices, settings);
         return;
       }
     }
-    triggerCloudUpload(nextCats, assets, records, settings);
+    triggerCloudUpload(nextCats, assets, transactions, monthlyPrices, settings);
   };
 
   // Asset CRUD
@@ -684,7 +1030,56 @@ export default function App() {
     const astObj: Asset = { ...newAst, id: `ast-${Date.now()}`, updatedAt: new Date().toISOString() };
     const nextAssets = [...assets, astObj];
     setAssets(nextAssets);
-    triggerCloudUpload(categories, nextAssets, records, settings);
+    saveAssets(nextAssets);
+    setFilters((prev) => ({
+      ...prev,
+      categoryIds: Array.from(new Set([...prev.categoryIds, newAst.categoryId])),
+      assetIds: Array.from(new Set([...prev.assetIds, astObj.id])),
+    }));
+    triggerCloudUpload(categories, nextAssets, transactions, monthlyPrices, settings);
+  };
+
+  const handleAddAssetWithCategory = (
+    newAst: Omit<Asset, 'id'>,
+    newCat?: Omit<Category, 'id'>
+  ) => {
+    let nextCats = categories;
+    let targetCatId = newAst.categoryId;
+
+    if (newCat) {
+      targetCatId = `cat-${Date.now()}`;
+      const catObj: Category = {
+        ...newCat,
+        id: targetCatId,
+        updatedAt: new Date().toISOString(),
+      };
+      nextCats = [...categories, catObj];
+      setCategories(nextCats);
+      saveCategories(nextCats);
+    }
+
+    const astObj: Asset = {
+      ...newAst,
+      categoryId: targetCatId,
+      id: `ast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      updatedAt: new Date().toISOString(),
+    };
+    const nextAssets = [...assets, astObj];
+    setAssets(nextAssets);
+    saveAssets(nextAssets);
+
+    if (newAst.currentPrice && !newAst.isCash) {
+      setLivePrices((prev) => ({ ...prev, [astObj.id]: newAst.currentPrice! }));
+    }
+
+    setFilters((prev) => ({
+      ...prev,
+      categoryIds: Array.from(new Set([...prev.categoryIds, targetCatId])),
+      assetIds: Array.from(new Set([...prev.assetIds, astObj.id])),
+    }));
+
+    triggerCloudUpload(nextCats, nextAssets, transactions, monthlyPrices, settings);
+    return astObj;
   };
 
   const handleEditAsset = (id: string, updated: Partial<Asset>) => {
@@ -692,121 +1087,107 @@ export default function App() {
       a.id === id ? { ...a, ...updated, updatedAt: new Date().toISOString() } : a
     );
     setAssets(nextAssets);
-    triggerCloudUpload(categories, nextAssets, records, settings);
+    saveAssets(nextAssets);
+    triggerCloudUpload(categories, nextAssets, transactions, monthlyPrices, settings);
   };
 
   const handleDeleteAsset = (id: string) => {
     const nextAssets = assets.filter((a) => a.id !== id);
     setAssets(nextAssets);
-    const nextRecords = records.map((rec) => {
-      const newAssetVals = { ...(rec.assetValues || {}) };
-      delete newAssetVals[id];
-      const newInvestedVals = { ...(rec.assetInvestedValues || {}) };
-      delete newInvestedVals[id];
-      return {
-        ...rec,
-        assetValues: newAssetVals,
-        assetInvestedValues: newInvestedVals,
-      };
-    });
-    setRecords(nextRecords);
-    triggerCloudUpload(categories, nextAssets, nextRecords, settings);
+    saveAssets(nextAssets);
+    triggerCloudUpload(categories, nextAssets, transactions, monthlyPrices, settings);
   };
 
   const handleReassignAssetAndDelete = (sourceAssetId: string, targetAssetId: string) => {
-    const nextRecords = records.map((rec) => {
-      const oldSrcVal = rec.assetValues?.[sourceAssetId] || 0;
-      const oldTargetVal = rec.assetValues?.[targetAssetId] || 0;
-      const newAssetVals = { ...(rec.assetValues || {}) };
-      delete newAssetVals[sourceAssetId];
-      newAssetVals[targetAssetId] = oldTargetVal + oldSrcVal;
-
-      const oldSrcInv = rec.assetInvestedValues?.[sourceAssetId] || 0;
-      const oldTargetInv = rec.assetInvestedValues?.[targetAssetId] || 0;
-      const newInvestedVals = { ...(rec.assetInvestedValues || {}) };
-      delete newInvestedVals[sourceAssetId];
-      newInvestedVals[targetAssetId] = oldTargetInv + oldSrcInv;
-
-      return {
-        ...rec,
-        assetValues: newAssetVals,
-        assetInvestedValues: newInvestedVals,
-      };
+    const nextTx = transactions.map((t) => {
+      let changed = false;
+      let newFrom = t.fromAssetId;
+      let newTo = t.toAssetId;
+      if (t.fromAssetId === sourceAssetId) {
+        newFrom = targetAssetId;
+        changed = true;
+      }
+      if (t.toAssetId === sourceAssetId) {
+        newTo = targetAssetId;
+        changed = true;
+      }
+      return changed ? { ...t, fromAssetId: newFrom, toAssetId: newTo } : t;
     });
-    setRecords(nextRecords);
+    setTransactions(nextTx);
+    saveTransactions(nextTx);
     const nextAssets = assets.filter((a) => a.id !== sourceAssetId);
     setAssets(nextAssets);
-    triggerCloudUpload(categories, nextAssets, nextRecords, settings);
+    saveAssets(nextAssets);
+    triggerCloudUpload(categories, nextAssets, nextTx, monthlyPrices, settings);
   };
 
   const handleReassignCategoryAndDelete = (sourceCategoryId: string, targetCategoryId: string) => {
     const nextAssets = assets.map((a) => (a.categoryId === sourceCategoryId ? { ...a, categoryId: targetCategoryId } : a));
     setAssets(nextAssets);
+    saveAssets(nextAssets);
     const nextCats = categories.filter((c) => c.id !== sourceCategoryId);
     setCategories(nextCats);
-    triggerCloudUpload(nextCats, nextAssets, records, settings);
+    saveCategories(nextCats);
+    triggerCloudUpload(nextCats, nextAssets, transactions, monthlyPrices, settings);
   };
 
   const handleUpdateCategoryTargets = (updatedCategories: Category[]) => {
     setCategories(updatedCategories);
     saveCategories(updatedCategories);
-    triggerCloudUpload(updatedCategories, assets, records, settings);
+    triggerCloudUpload(updatedCategories, assets, transactions, monthlyPrices, settings);
   };
 
-  // Reset to Demo
+  // Factory Reset
   const handleResetDemoData = () => {
-    resetToDemoData();
-    saveDeletedMonths([]);
+    resetAllDataToZero();
+    setCategories([]);
+    setAssets([]);
+    setTransactions([]);
+    setMonthlyPrices({});
+    setMonthlyNotes({});
+    setLivePrices({});
+    setFilters({
+      categoryIds: [],
+      assetIds: [],
+      riskLevels: ['Low', 'Medium', 'High'],
+      searchQuery: '',
+    });
+    triggerCloudUpload([], [], [], {}, settings, true);
+  };
+
+  const handleRefreshData = () => {
     const nextCats = loadCategories();
     const nextAssets = loadAssets();
-    const nextRecords = loadMonthlyRecords();
+    const nextTx = loadTransactions();
+    const nextPrices = loadMonthlyPrices();
+    const nextNotes = loadMonthlyNotes();
     const nextSettings = loadSettings();
+
+    const restoredSpotPrices: Record<string, number> = {};
+    nextAssets.forEach((a) => {
+      if (a.currentPrice && a.currentPrice > 0) {
+        restoredSpotPrices[a.id] = a.currentPrice;
+      }
+    });
+
     setCategories(nextCats);
     setAssets(nextAssets);
-    setRecords(nextRecords);
+    setTransactions(nextTx);
+    setMonthlyPrices(nextPrices);
+    setMonthlyNotes(nextNotes);
     setSettings(nextSettings);
+    setLivePrices((prev) => ({ ...prev, ...restoredSpotPrices }));
     setFilters({
       categoryIds: nextCats.map((c) => c.id),
       assetIds: nextAssets.map((a) => a.id),
       riskLevels: ['Low', 'Medium', 'High'],
       searchQuery: '',
     });
-    triggerCloudUpload(nextCats, nextAssets, nextRecords, nextSettings);
-  };
-
-  const handleRefreshData = () => {
-    const nextCats = loadCategories();
-    const nextAssets = loadAssets();
-    const nextRecords = loadMonthlyRecords();
-    const nextSettings = loadSettings();
-    setCategories(nextCats);
-    setAssets(nextAssets);
-    setRecords(nextRecords);
-    setSettings(nextSettings);
-    triggerCloudUpload(nextCats, nextAssets, nextRecords, nextSettings);
-  };
-
-  const handleApplyImportedData = (
-    newCats: Category[],
-    newAssets: Asset[],
-    newRecords: MonthlyRecord[]
-  ) => {
-    saveCategories(newCats);
-    saveAssets(newAssets);
-    saveMonthlyRecords(newRecords);
-    setCategories(newCats);
-    setAssets(newAssets);
-    setRecords(newRecords);
-    setFilters((prev) => ({
-      ...prev,
-      categoryIds: newCats.map((c) => c.id),
-      assetIds: newAssets.map((a) => a.id),
-    }));
-    triggerCloudUpload(newCats, newAssets, newRecords, settings);
+    triggerCloudUpload(nextCats, nextAssets, nextTx, nextPrices, nextSettings, true);
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-emerald-500 selection:text-slate-950">
+    <div className="min-h-screen bg-[#080C14] text-slate-100 font-sans selection:bg-emerald-500 selection:text-slate-950">
       
       {/* App Header */}
       <Header
@@ -832,17 +1213,24 @@ export default function App() {
         {/* KPI Metrics Summary Bar */}
         <MetricsCards
           monthName={metrics.monthName}
+          isLive={metrics.isLive}
           totalPortfolio={metrics.totalPortfolio}
           prevTotalPortfolio={metrics.prevTotalPortfolio}
           totalMoneyInvested={metrics.totalMoneyInvested}
           monthlyMoneyInvested={metrics.monthlyMoneyInvested}
           floatingPL={metrics.floatingPL}
           floatingPLPercent={metrics.floatingPLPercent}
+          totalDividendIncome={metrics.totalDividendIncome}
+          monthlyDividendIncome={metrics.monthlyDividendIncome}
           emergencyFund={metrics.emergencyFund}
           totalCapital={metrics.totalCapital}
           currencySymbol={settings.currencySymbol}
           stealthMode={settings.stealthMode}
           riskBreakdown={metrics.riskBreakdown}
+          portfolioHistory={sixMonthPortfolioTrend}
+          investedHistory={sixMonthInvestedTrend}
+          savingsHistory={sixMonthSavingsTrend}
+          assetPLContributions={metrics.assetPLContributions}
         />
 
         {/* Global Asset & Category Filter Bar */}
@@ -854,10 +1242,13 @@ export default function App() {
             onUpdateFilters={handleUpdateFilters}
             onResetFilters={handleResetFilters}
             isSummaryTab={activeTab === 'dashboard' && chartType === 'all'}
+            currencySymbol={settings.currencySymbol}
+            stealthMode={settings.stealthMode}
+            livePrices={livePrices}
           />
         )}
 
-        {/* Active Tab View Rendering */}
+        {/* Tab 1: Dashboards */}
         {activeTab === 'dashboard' && (
           <ChartsView
             records={records}
@@ -872,6 +1263,24 @@ export default function App() {
           />
         )}
 
+        {/* Tab 2: Transaction Ledger (Single Data Entry) */}
+        {activeTab === 'ledger' && (
+          <LedgerView
+            transactions={transactions}
+            assets={assets}
+            categories={categories}
+            currencySymbol={settings.currencySymbol}
+            stealthMode={settings.stealthMode}
+            onAddTransaction={handleAddTransaction}
+            onEditTransaction={handleEditTransaction}
+            onDeleteTransaction={handleDeleteTransaction}
+            onOpenHierarchyTab={() => setActiveTab('hierarchy')}
+            onAddAssetWithCategory={handleAddAssetWithCategory}
+            onEditAsset={handleEditAsset}
+          />
+        )}
+
+        {/* Tab 3: Monthly Spreadsheet */}
         {activeTab === 'spreadsheet' && (
           <SpreadsheetView
             records={records}
@@ -883,10 +1292,12 @@ export default function App() {
             onOpenMonthEditor={handleOpenMonthEditor}
             onDeleteRecord={handleDeleteRecord}
             onDuplicateRecord={handleDuplicateRecord}
-            onOpenDataModal={() => setIsDataModalOpen(true)}
+            onUpdateMonthPrice={handleUpdateMonthPrice}
+            onUpdateMonthNote={handleUpdateMonthNote}
           />
         )}
 
+        {/* Tab 4: Assets & Risk Hierarchy */}
         {activeTab === 'hierarchy' && (
           <HierarchyManager
             categories={categories}
@@ -901,9 +1312,11 @@ export default function App() {
             onEditAsset={handleEditAsset}
             onDeleteAsset={handleDeleteAsset}
             onReassignAssetAndDelete={handleReassignAssetAndDelete}
+            onAddAssetWithCategory={handleAddAssetWithCategory}
           />
         )}
 
+        {/* Tab 5: Rebalance */}
         {activeTab === 'rebalance' && (
           <RebalanceView
             categories={categories}
@@ -936,8 +1349,9 @@ export default function App() {
         categories={categories}
         assets={assets}
         records={records}
+        transactions={transactions}
+        monthlyPrices={monthlyPrices}
         settings={settings}
-        onApplyImportedData={handleApplyImportedData}
         onRefreshData={handleRefreshData}
         onResetDemo={handleResetDemoData}
       />
@@ -945,7 +1359,7 @@ export default function App() {
       {/* Delete Record Confirmation Modal */}
       {deletingRecordId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4">
+          <div className="fintech-card rounded-xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4">
             <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto">
               <Trash2 className="w-6 h-6" />
             </div>
@@ -958,13 +1372,13 @@ export default function App() {
             <div className="flex items-center gap-2 pt-2">
               <button
                 onClick={() => setDeletingRecordId(null)}
-                className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition-all cursor-pointer"
+                className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition-all cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDeleteRecord}
-                className="flex-1 px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-xl shadow-md shadow-rose-600/20 transition-all cursor-pointer"
+                className="flex-1 px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-lg transition-all cursor-pointer"
               >
                 Delete
               </button>
@@ -974,10 +1388,10 @@ export default function App() {
       )}
 
       {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950 py-6 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>Monthly Asset & Investment Portfolio Tracker</span>
-          <span className="text-slate-600">3-Level Hierarchy: Risk Levels &rarr; Categories &rarr; Assets</span>
+      <footer className="border-t border-slate-900/90 bg-[#080C14] py-6 text-center text-xs text-slate-500">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <span>ValuaQ <span aria-hidden="true">·</span> Quantity-Based Wealth &amp; Risk Engine</span>
+          <span className="text-slate-600">Base Currency: NTD (NT$)</span>
         </div>
       </footer>
 

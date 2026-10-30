@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Filter, CheckSquare, Square, Search, RefreshCw, ChevronDown, ChevronUp, Tag, Shield } from 'lucide-react';
+import { CheckSquare, Square, Search, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import { Category, Asset, RiskLevel, FilterState } from '../types';
+import { formatCurrency } from '../lib/formatters';
+import { getAssetBasePrice } from '../lib/ledgerEngine';
 
 interface FilterBarProps {
   categories: Category[];
@@ -9,6 +11,9 @@ interface FilterBarProps {
   onUpdateFilters: (newFilters: Partial<FilterState>) => void;
   onResetFilters: () => void;
   isSummaryTab?: boolean;
+  currencySymbol?: string;
+  stealthMode?: boolean;
+  livePrices?: Record<string, number>;
 }
 
 export const FilterBar: React.FC<FilterBarProps> = ({
@@ -18,6 +23,9 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   onUpdateFilters,
   onResetFilters,
   isSummaryTab = false,
+  currencySymbol = 'NT$',
+  stealthMode = false,
+  livePrices,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -152,38 +160,38 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     (isSummaryTab && filters.includeEmergencyFund === false);
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-sm p-3 sm:p-4 mb-6">
+    <div className="fintech-card rounded-xl px-4 py-3 mb-6">
       
       {/* Top Filter Bar Controls */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
         
-        {/* Search & Active Count Badge */}
-        <div className="flex items-center space-x-3 w-full sm:w-auto">
+        {/* Search & Active Count */}
+        <div className="flex items-center gap-3.5 w-full sm:w-auto">
           <div className="relative flex-1 sm:w-64">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Filter assets or categories..."
               value={filters.searchQuery}
               onChange={(e) => onUpdateFilters({ searchQuery: e.target.value })}
-              className="w-full bg-slate-800/80 border border-slate-700 text-slate-200 text-xs rounded-xl pl-9 pr-3 py-2 focus:outline-none focus:border-emerald-500 transition-colors"
+              className="w-full bg-[#080C14] border border-slate-800 text-slate-200 text-xs rounded-lg pl-8 pr-3 py-1.5 focus:outline-none focus:border-emerald-500/60 transition-colors"
             />
           </div>
 
-          <div className="flex items-center gap-1.5 text-xs text-slate-400 whitespace-nowrap">
-            <Filter className="w-3.5 h-3.5 text-emerald-400" />
-            <span>
-              Showing <strong className="text-emerald-400 font-semibold">{activeAssetsCount}</strong> / {totalAssetsCount} Assets
-            </span>
+          <div className="text-xs text-slate-400 whitespace-nowrap font-mono tabular-nums">
+            <span>Showing </span>
+            <strong className="text-emerald-400 font-semibold">{activeAssetsCount}</strong>
+            <span className="text-slate-600"> / </span>
+            <span>{totalAssetsCount} Assets</span>
           </div>
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
           {isFiltered && (
             <button
               onClick={onResetFilters}
-              className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 px-2.5 py-1.5 rounded-lg border border-amber-500/20 transition-all font-medium"
+              className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 px-3 py-1.5 rounded-lg border border-amber-500/20 transition-all font-medium whitespace-nowrap shrink-0 cursor-pointer"
             >
               <RefreshCw className="w-3 h-3" />
               <span>Reset Filter</span>
@@ -192,23 +200,22 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="flex items-center gap-1 text-xs text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1.5 rounded-lg border border-emerald-500/20 transition-all font-medium"
+            className="flex items-center gap-1.5 text-xs text-slate-200 hover:text-white bg-slate-800/70 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700/80 transition-all font-medium whitespace-nowrap shrink-0 cursor-pointer"
           >
-            <span>Filter By Category & Risk</span>
-            {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            <span>Filter By Category &amp; Risk</span>
+            {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-emerald-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
           </button>
         </div>
       </div>
 
       {/* Expanded Filter Panel */}
       {isExpanded && (
-        <div className="mt-4 pt-4 border-t border-slate-800 space-y-4 animate-in fade-in duration-200">
+        <div className="mt-3.5 pt-3.5 border-t border-slate-800/80 space-y-4 animate-in fade-in duration-150">
           
           {/* Risk Level Filter Section */}
           <div>
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Shield className="w-3.5 h-3.5 text-emerald-400" />
-              Filter by Risk Level:
+            <label className="text-xs font-semibold text-slate-300 mb-2 block">
+              Risk Level
             </label>
             <div className="flex flex-wrap gap-2">
               {riskLevels.map((risk) => {
@@ -217,10 +224,10 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                   <button
                     key={risk}
                     onClick={() => handleToggleRisk(risk)}
-                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border transition-all font-medium ${
+                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-all font-medium whitespace-nowrap shrink-0 cursor-pointer ${
                       isActive
-                        ? 'bg-slate-800 border-emerald-500/50 text-slate-100 shadow-sm'
-                        : 'bg-slate-900/60 border-slate-800 text-slate-500 hover:border-slate-700'
+                        ? 'bg-slate-800/90 border-emerald-500/40 text-slate-100'
+                        : 'bg-[#080C14] border-slate-800 text-slate-500 hover:border-slate-700'
                     }`}
                   >
                     {isActive ? <CheckSquare className="w-3.5 h-3.5 text-emerald-400" /> : <Square className="w-3.5 h-3.5 text-slate-600" />}
@@ -233,9 +240,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
           {/* Category Filter Section */}
           <div>
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Tag className="w-3.5 h-3.5 text-blue-400" />
-              Filter by Category:
+            <label className="text-xs font-semibold text-slate-300 mb-2 block">
+              Asset Categories
             </label>
             <div className="flex flex-wrap gap-2">
               {categories.map((cat) => {
@@ -244,18 +250,19 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                   <button
                     key={cat.id}
                     onClick={() => handleToggleCategory(cat.id)}
-                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border transition-all font-medium ${
+                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-all font-medium whitespace-nowrap shrink-0 cursor-pointer ${
                       isActive
-                        ? 'bg-slate-800 border-slate-700 text-slate-100'
-                        : 'bg-slate-900/60 border-slate-800 text-slate-500 hover:border-slate-700'
+                        ? 'bg-slate-800/90 border-slate-700 text-slate-100'
+                        : 'bg-[#080C14] border-slate-800 text-slate-500 hover:border-slate-700'
                     }`}
                   >
                     <span
-                      className="w-2.5 h-2.5 rounded-full"
+                      className="w-2 h-2 rounded-full"
                       style={{ backgroundColor: isActive ? cat.color : '#475569' }}
                     />
                     <span>{cat.name}</span>
-                    <span className="text-[10px] text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded">
+                    <span className="text-slate-600" aria-hidden="true">·</span>
+                    <span className="text-[11px] text-slate-400 font-normal">
                       {cat.riskLevel}
                     </span>
                   </button>
@@ -269,21 +276,22 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                       includeEmergencyFund: filters.includeEmergencyFund === false ? true : false,
                     })
                   }
-                  className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border transition-all font-medium ${
+                  className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-all font-medium whitespace-nowrap shrink-0 cursor-pointer ${
                     filters.includeEmergencyFund !== false
-                      ? 'bg-slate-800 border-slate-700 text-slate-100'
-                      : 'bg-slate-900/60 border-slate-800 text-slate-500 hover:border-slate-700'
+                      ? 'bg-slate-800/90 border-slate-700 text-slate-100'
+                      : 'bg-[#080C14] border-slate-800 text-slate-500 hover:border-slate-700'
                   }`}
                 >
                   <span
-                    className="w-2.5 h-2.5 rounded-full"
+                    className="w-2 h-2 rounded-full"
                     style={{
                       backgroundColor:
                         filters.includeEmergencyFund !== false ? '#10b981' : '#475569',
                     }}
                   />
                   <span>Emergency Fund</span>
-                  <span className="text-[10px] text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded">
+                  <span className="text-slate-600" aria-hidden="true">·</span>
+                  <span className="text-[11px] text-slate-400 font-normal">
                     Low
                   </span>
                 </button>
@@ -291,31 +299,45 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             </div>
           </div>
 
-          {/* Individual Assets Filter Pills */}
+          {/* Individual Assets Filter */}
           <div>
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 block">
-              Filter Individual Assets:
+            <label className="text-xs font-semibold text-slate-300 mb-2 block">
+              Individual Assets
             </label>
             <div className="flex flex-wrap gap-2">
               {assets.map((asset) => {
                 const isActive = filters.assetIds.includes(asset.id);
                 const category = categories.find((c) => c.id === asset.categoryId);
+                const curr = (asset.currency || 'NTD').toUpperCase();
+                const isBaseCash = Boolean(asset.isCash && (curr === 'NTD' || curr === 'TWD'));
+                const unitPrice = getAssetBasePrice(asset, undefined, livePrices);
                 return (
                   <button
                     key={asset.id}
                     onClick={() => handleToggleAsset(asset.id)}
-                    className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border transition-all ${
+                    className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                       isActive
-                        ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-                        : 'bg-slate-800/40 text-slate-500 border-slate-800 hover:border-slate-700'
+                        ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30 font-medium'
+                        : 'bg-[#080C14] text-slate-500 border-slate-800 hover:border-slate-700'
                     }`}
                   >
                     {isActive ? <CheckSquare className="w-3 h-3 text-emerald-400" /> : <Square className="w-3 h-3 text-slate-600" />}
                     <span>{asset.name}</span>
                     {category && (
-                      <span className="text-[10px] text-slate-500">
-                        ({category.name})
-                      </span>
+                      <>
+                        <span className="text-slate-600" aria-hidden="true">·</span>
+                        <span className="text-[11px] text-slate-400 font-normal">
+                          {category.name}
+                        </span>
+                      </>
+                    )}
+                    {!isBaseCash && (
+                      <>
+                        <span className="text-slate-600" aria-hidden="true">·</span>
+                        <span className="text-[11px] font-mono tabular-nums text-emerald-400 font-semibold">
+                          {formatCurrency(unitPrice, currencySymbol, stealthMode)}
+                        </span>
+                      </>
                     )}
                   </button>
                 );
@@ -328,10 +350,10 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                       includeEmergencyFund: filters.includeEmergencyFund === false ? true : false,
                     })
                   }
-                  className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border transition-all ${
+                  className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                     filters.includeEmergencyFund !== false
-                      ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-                      : 'bg-slate-800/40 text-slate-500 border-slate-800 hover:border-slate-700'
+                      ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30 font-medium'
+                      : 'bg-[#080C14] text-slate-500 border-slate-800 hover:border-slate-700'
                   }`}
                 >
                   {filters.includeEmergencyFund !== false ? (
@@ -340,8 +362,9 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                     <Square className="w-3 h-3 text-slate-600" />
                   )}
                   <span>Emergency Fund</span>
-                  <span className="text-[10px] text-slate-500">
-                    (Cash Reserve)
+                  <span className="text-slate-600" aria-hidden="true">·</span>
+                  <span className="text-[11px] text-slate-400 font-normal">
+                    Cash Reserve
                   </span>
                 </button>
               )}

@@ -1,12 +1,15 @@
-import { Category, Asset, MonthlyRecord, AppSettings } from '../types';
+import { Category, Asset, MonthlyRecord, AppSettings, LedgerTransaction, MonthlyPriceMap, MonthlyNotesMap } from '../types';
 import { initialCategories, initialAssets, initialMonthlyRecords, initialSettings } from '../data/initialData';
 
 const STORAGE_KEYS = {
-  CATEGORIES: 'asset_tracker_categories_v3',
-  ASSETS: 'asset_tracker_assets_v3',
-  RECORDS: 'asset_tracker_records_v3',
-  SETTINGS: 'asset_tracker_settings_v3',
-  DELETED_MONTHS: 'asset_tracker_deleted_months_v3',
+  CATEGORIES: 'valuaq_categories_v4_zero',
+  ASSETS: 'valuaq_assets_v4_zero',
+  RECORDS: 'valuaq_records_v4_zero',
+  SETTINGS: 'valuaq_settings_v4_zero',
+  DELETED_MONTHS: 'valuaq_deleted_months_v4_zero',
+  TRANSACTIONS: 'valuaq_transactions_v4_zero',
+  MONTHLY_PRICES: 'valuaq_monthly_prices_v4_zero',
+  MONTHLY_NOTES: 'valuaq_monthly_notes_v4_zero',
 };
 
 export function loadDeletedMonths(): string[] {
@@ -75,24 +78,97 @@ export function saveAssets(assets: Asset[]): void {
   }
 }
 
+export function loadTransactions(): LedgerTransaction[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.error('Failed to load transactions from storage', e);
+  }
+  return [];
+}
+
+export function saveTransactions(transactions: LedgerTransaction[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions));
+  } catch (e) {
+    console.error('Failed to save transactions to storage', e);
+  }
+}
+
+export function loadMonthlyPrices(): MonthlyPriceMap {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.MONTHLY_PRICES);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.error('Failed to load monthly prices from storage', e);
+  }
+  return {};
+}
+
+export function saveMonthlyPrices(prices: MonthlyPriceMap): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.MONTHLY_PRICES, JSON.stringify(prices));
+  } catch (e) {
+    console.error('Failed to save monthly prices to storage', e);
+  }
+}
+
+export function loadMonthlyNotes(): MonthlyNotesMap {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.MONTHLY_NOTES);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.error('Failed to load monthly notes from storage', e);
+  }
+  return {};
+}
+
+export function saveMonthlyNotes(notes: MonthlyNotesMap): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.MONTHLY_NOTES, JSON.stringify(notes));
+  } catch (e) {
+    console.error('Failed to save monthly notes to storage', e);
+  }
+}
+
+export function setMonthNote(
+  existingNotes: MonthlyNotesMap,
+  month: string,
+  monthNote?: string,
+  assetNotes?: Record<string, string>
+): MonthlyNotesMap {
+  const next: MonthlyNotesMap = { ...existingNotes };
+  const current = next[month] || {};
+  next[month] = {
+    monthNote: monthNote !== undefined ? monthNote : current.monthNote,
+    assetNotes: assetNotes !== undefined ? assetNotes : current.assetNotes || {},
+    updatedAt: new Date().toISOString(),
+  };
+  return next;
+}
+
 export function recalculateMonthlyRecords(records: MonthlyRecord[]): MonthlyRecord[] {
   // Sort chronologically by month ("YYYY-MM")
   const sorted = [...records].sort((a, b) => a.month.localeCompare(b.month));
   let runningTotalInvested = 0;
 
   return sorted.map((record) => {
-    // 1. Monthly Investment[month] = Sum of Money Invested for each asset for a certain month
-    const monthlyMoneyInvested = Object.values(record.assetInvestedValues || {}).reduce(
-      (sum, val) => sum + (Number(val) || 0),
-      0
-    );
+    // 1. Monthly Investment[month] = Sum of Money Invested for each asset for a certain month (or direct deposit amount)
+    let monthlyMoneyInvested = record.monthlyMoneyInvested;
+    if (monthlyMoneyInvested === undefined || monthlyMoneyInvested === 0) {
+      monthlyMoneyInvested = Object.values(record.assetInvestedValues || {}).reduce(
+        (sum, val) => sum + (Number(val) || 0),
+        0
+      );
+    }
 
     // 2. Total Invested[Month] = Total Invested[Month - 1] + Monthly Investment[Month]
-    runningTotalInvested += monthlyMoneyInvested;
+    runningTotalInvested += (monthlyMoneyInvested || 0);
 
     return {
       ...record,
-      monthlyMoneyInvested,
+      monthlyMoneyInvested: monthlyMoneyInvested || 0,
       totalMoneyInvested: runningTotalInvested,
     };
   });
@@ -111,11 +187,7 @@ export function loadMonthlyRecords(): MonthlyRecord[] {
   } catch (e) {
     console.error('Failed to load monthly records from storage', e);
   }
-  const uniqueMap = new Map<string, MonthlyRecord>();
-  initialMonthlyRecords.forEach((r) => uniqueMap.set(r.month, r));
-  const recalculated = recalculateMonthlyRecords(Array.from(uniqueMap.values()));
-  saveMonthlyRecords(recalculated);
-  return recalculated;
+  return [];
 }
 
 export function saveMonthlyRecords(records: MonthlyRecord[]): void {
@@ -154,6 +226,10 @@ export interface BackupData {
   categories: Category[];
   assets: Asset[];
   records: MonthlyRecord[];
+  transactions?: LedgerTransaction[];
+  monthlyPrices?: MonthlyPriceMap;
+  monthlyNotes?: MonthlyNotesMap;
+  deletedRecordMonths?: string[];
   settings: AppSettings;
 }
 
@@ -164,35 +240,94 @@ export interface LocalSnapshot {
   recordCount: number;
   assetCount: number;
   categoryCount: number;
+  transactionCount?: number;
   data: BackupData;
 }
 
 export function exportAllData(): string {
   const data: BackupData = {
-    version: '1.0.0',
+    version: '2.0.0',
     timestamp: new Date().toISOString(),
     categories: loadCategories(),
     assets: loadAssets(),
+    transactions: loadTransactions(),
+    monthlyPrices: loadMonthlyPrices(),
+    monthlyNotes: loadMonthlyNotes(),
     records: loadMonthlyRecords(),
+    deletedRecordMonths: loadDeletedMonths(),
     settings: loadSettings(),
   };
   return JSON.stringify(data, null, 2);
 }
 
-export function importAllData(jsonString: string): boolean {
+export function parseAndValidateBackupJson(jsonString: string): {
+  valid: boolean;
+  data?: BackupData;
+  error?: string;
+} {
   try {
-    const parsed = JSON.parse(jsonString) as BackupData;
-    if (parsed.categories && parsed.assets && parsed.records) {
-      saveCategories(parsed.categories);
-      saveAssets(parsed.assets);
-      saveMonthlyRecords(parsed.records);
-      if (parsed.settings) saveSettings(parsed.settings);
-      return true;
+    const parsed = JSON.parse(jsonString);
+    if (!parsed || typeof parsed !== 'object') {
+      return { valid: false, error: 'Backup content must be a valid JSON object.' };
     }
-  } catch (e) {
-    console.error('Invalid backup data format', e);
+    if (!Array.isArray(parsed.categories) || !Array.isArray(parsed.assets)) {
+      return {
+        valid: false,
+        error: 'Missing required configuration arrays ("categories" and "assets").',
+      };
+    }
+    const normalized: BackupData = {
+      version: parsed.version || '2.0.0',
+      timestamp: parsed.timestamp || new Date().toISOString(),
+      categories: parsed.categories,
+      assets: parsed.assets,
+      transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
+      monthlyPrices:
+        parsed.monthlyPrices && typeof parsed.monthlyPrices === 'object'
+          ? parsed.monthlyPrices
+          : {},
+      monthlyNotes:
+        parsed.monthlyNotes && typeof parsed.monthlyNotes === 'object'
+          ? parsed.monthlyNotes
+          : {},
+      records: Array.isArray(parsed.records) ? parsed.records : [],
+      deletedRecordMonths: Array.isArray(parsed.deletedRecordMonths)
+        ? parsed.deletedRecordMonths
+        : [],
+      settings:
+        parsed.settings && typeof parsed.settings === 'object'
+          ? { ...initialSettings, ...parsed.settings, currencySymbol: 'NT$' }
+          : { ...initialSettings, currencySymbol: 'NT$' },
+    };
+    return { valid: true, data: normalized };
+  } catch (e: any) {
+    return {
+      valid: false,
+      error: e?.message || 'Invalid JSON syntax.',
+    };
   }
-  return false;
+}
+
+export function importAllData(jsonString: string): boolean {
+  const validation = parseAndValidateBackupJson(jsonString);
+  if (!validation.valid || !validation.data) {
+    return false;
+  }
+  const { data } = validation;
+  try {
+    saveCategories(data.categories);
+    saveAssets(data.assets);
+    saveTransactions(data.transactions || []);
+    saveMonthlyPrices(data.monthlyPrices || {});
+    saveMonthlyNotes(data.monthlyNotes || {});
+    saveMonthlyRecords(data.records || []);
+    saveDeletedMonths(data.deletedRecordMonths || []);
+    saveSettings(data.settings);
+    return true;
+  } catch (e) {
+    console.error('Failed to restore backup data to storage', e);
+    return false;
+  }
 }
 
 export function getLocalSnapshots(): LocalSnapshot[] {
@@ -209,6 +344,9 @@ export function createLocalSnapshot(customName?: string): LocalSnapshot {
   const currentCategories = loadCategories();
   const currentAssets = loadAssets();
   const currentRecords = loadMonthlyRecords();
+  const currentTransactions = loadTransactions();
+  const currentMonthlyPrices = loadMonthlyPrices();
+  const currentMonthlyNotes = loadMonthlyNotes();
   const currentSettings = loadSettings();
 
   const now = new Date();
@@ -223,18 +361,21 @@ export function createLocalSnapshot(customName?: string): LocalSnapshot {
     recordCount: currentRecords.length,
     assetCount: currentAssets.length,
     categoryCount: currentCategories.length,
+    transactionCount: currentTransactions.length,
     data: {
-      version: '1.0.0',
+      version: '2.0.0',
       timestamp: now.toISOString(),
       categories: currentCategories,
       assets: currentAssets,
       records: currentRecords,
+      transactions: currentTransactions,
+      monthlyPrices: currentMonthlyPrices,
+      monthlyNotes: currentMonthlyNotes,
       settings: currentSettings,
     },
   };
 
   const existing = getLocalSnapshots();
-  // Keep up to 25 latest snapshots
   const updated = [snapshot, ...existing].slice(0, 25);
   try {
     localStorage.setItem('asset_tracker_local_snapshots_v1', JSON.stringify(updated));
@@ -253,6 +394,9 @@ export function restoreLocalSnapshot(id: string): boolean {
     saveCategories(target.data.categories);
     saveAssets(target.data.assets);
     saveMonthlyRecords(target.data.records);
+    if (target.data.transactions) saveTransactions(target.data.transactions);
+    if (target.data.monthlyPrices) saveMonthlyPrices(target.data.monthlyPrices);
+    if (target.data.monthlyNotes) saveMonthlyNotes(target.data.monthlyNotes);
     if (target.data.settings) saveSettings(target.data.settings);
     return true;
   } catch (e) {
@@ -271,18 +415,29 @@ export function deleteLocalSnapshot(id: string): void {
   }
 }
 
-export function resetToDemoData(): void {
+export function resetAllDataToZero(): void {
   try {
     localStorage.removeItem(STORAGE_KEYS.CATEGORIES);
     localStorage.removeItem(STORAGE_KEYS.ASSETS);
     localStorage.removeItem(STORAGE_KEYS.RECORDS);
     localStorage.removeItem(STORAGE_KEYS.SETTINGS);
+    localStorage.removeItem(STORAGE_KEYS.DELETED_MONTHS);
+    localStorage.removeItem(STORAGE_KEYS.TRANSACTIONS);
+    localStorage.removeItem(STORAGE_KEYS.MONTHLY_PRICES);
+    localStorage.removeItem(STORAGE_KEYS.MONTHLY_NOTES);
   } catch (e) {
     console.error('Failed to clear storage keys', e);
   }
-  saveCategories(initialCategories);
-  saveAssets(initialAssets);
-  saveMonthlyRecords(initialMonthlyRecords);
+  saveCategories([]);
+  saveAssets([]);
+  saveMonthlyRecords([]);
+  saveTransactions([]);
+  saveMonthlyPrices({});
+  saveMonthlyNotes({});
+  saveDeletedMonths([]);
   saveSettings(initialSettings);
 }
 
+export function resetToDemoData(): void {
+  resetAllDataToZero();
+}

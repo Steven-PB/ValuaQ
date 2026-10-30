@@ -11,13 +11,13 @@ import {
   getFirestore, 
   doc, 
   setDoc, 
-  getDoc,
+  getDoc, 
   onSnapshot, 
   serverTimestamp 
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { Category, Asset, MonthlyRecord, AppSettings } from '../types';
-import { mergeMonthlyRecords, mergeCategories, mergeAssets, mergeSettings } from './syncMerge';
+import { Category, Asset, MonthlyRecord, AppSettings, LedgerTransaction, MonthlyPriceMap, MonthlyNotesMap } from '../types';
+import { mergeMonthlyRecords, mergeCategories, mergeAssets, mergeSettings, mergeTransactions, mergeMonthlyPrices } from './syncMerge';
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
@@ -51,6 +51,9 @@ export interface UserCloudData {
   categories: Category[];
   assets: Asset[];
   records: MonthlyRecord[];
+  transactions?: LedgerTransaction[];
+  monthlyPrices?: MonthlyPriceMap;
+  monthlyNotes?: MonthlyNotesMap;
   settings: AppSettings;
   deletedRecordMonths?: string[];
   updatedAt?: any;
@@ -96,13 +99,20 @@ export const syncDataToCloud = async (
     categories: Category[];
     assets: Asset[];
     records: MonthlyRecord[];
+    transactions?: LedgerTransaction[];
+    monthlyPrices?: MonthlyPriceMap;
+    monthlyNotes?: MonthlyNotesMap;
     settings: AppSettings;
     deletedRecordMonths?: string[];
-  }
+  },
+  options?: { overwrite?: boolean }
 ): Promise<{
   categories: Category[];
   assets: Asset[];
   records: MonthlyRecord[];
+  transactions: LedgerTransaction[];
+  monthlyPrices: MonthlyPriceMap;
+  monthlyNotes: MonthlyNotesMap;
   settings: AppSettings;
   deletedRecordMonths: string[];
 } | null> => {
@@ -114,14 +124,20 @@ export const syncDataToCloud = async (
     let finalCategories = localData.categories || [];
     let finalAssets = localData.assets || [];
     let finalRecords = localData.records || [];
+    let finalTransactions = localData.transactions || [];
+    let finalMonthlyPrices = localData.monthlyPrices || {};
+    let finalMonthlyNotes = localData.monthlyNotes || {};
     let finalSettings = localData.settings;
     let finalDeletedMonths = localData.deletedRecordMonths || [];
 
-    if (snapshot.exists()) {
+    if (snapshot.exists() && !options?.overwrite) {
       const cloudData = snapshot.data();
       const cloudRecords: MonthlyRecord[] = cloudData.monthlyRecords || [];
       const cloudCategories: Category[] = cloudData.categories || [];
       const cloudAssets: Asset[] = cloudData.assets || [];
+      const cloudTransactions: LedgerTransaction[] = cloudData.transactions || [];
+      const cloudMonthlyPrices: MonthlyPriceMap = cloudData.monthlyAssetPrices || cloudData.monthlyPrices || {};
+      const cloudMonthlyNotes: MonthlyNotesMap = cloudData.monthlyNotes || {};
       const cloudSettings: AppSettings = cloudData.settings;
       const cloudDeletedMonths: string[] = cloudData.deletedRecordMonths || [];
 
@@ -133,12 +149,18 @@ export const syncDataToCloud = async (
       finalRecords = recordMerge.merged;
       finalCategories = mergeCategories(cloudCategories, localData.categories);
       finalAssets = mergeAssets(cloudAssets, localData.assets);
+      finalTransactions = mergeTransactions(cloudTransactions, localData.transactions);
+      finalMonthlyPrices = mergeMonthlyPrices(cloudMonthlyPrices, localData.monthlyPrices);
+      finalMonthlyNotes = { ...cloudMonthlyNotes, ...(localData.monthlyNotes || {}) };
       finalSettings = mergeSettings(cloudSettings, localData.settings);
     }
 
     const cleanedCategories = deepCleanFirestoreData(finalCategories);
     const cleanedAssets = deepCleanFirestoreData(finalAssets);
     const cleanedRecords = deepCleanFirestoreData(finalRecords);
+    const cleanedTransactions = deepCleanFirestoreData(finalTransactions);
+    const cleanedMonthlyPrices = deepCleanFirestoreData(finalMonthlyPrices);
+    const cleanedMonthlyNotes = deepCleanFirestoreData(finalMonthlyNotes);
     const cleanedSettings = deepCleanFirestoreData(finalSettings || {
       currencySymbol: 'NT$',
       stealthMode: false,
@@ -151,6 +173,9 @@ export const syncDataToCloud = async (
       categories: cleanedCategories,
       assets: cleanedAssets,
       monthlyRecords: cleanedRecords,
+      transactions: cleanedTransactions,
+      monthlyAssetPrices: cleanedMonthlyPrices,
+      monthlyNotes: cleanedMonthlyNotes,
       settings: cleanedSettings,
       deletedRecordMonths: cleanedDeletedMonths,
       updatedAt: serverTimestamp(),
@@ -160,6 +185,9 @@ export const syncDataToCloud = async (
       categories: finalCategories,
       assets: finalAssets,
       records: finalRecords,
+      transactions: finalTransactions,
+      monthlyPrices: finalMonthlyPrices,
+      monthlyNotes: finalMonthlyNotes,
       settings: finalSettings,
       deletedRecordMonths: finalDeletedMonths,
     };
@@ -181,6 +209,9 @@ export const fetchUserCloudData = async (
       categories: data.categories || [],
       assets: data.assets || [],
       records: data.monthlyRecords || [],
+      transactions: data.transactions || [],
+      monthlyPrices: data.monthlyAssetPrices || data.monthlyPrices || {},
+      monthlyNotes: data.monthlyNotes || {},
       settings: data.settings || {
         currencySymbol: 'NT$',
         stealthMode: false,
@@ -207,6 +238,9 @@ export const subscribeToUserData = (
         categories: data.categories || [],
         assets: data.assets || [],
         records: data.monthlyRecords || [],
+        transactions: data.transactions || [],
+        monthlyPrices: data.monthlyAssetPrices || data.monthlyPrices || {},
+        monthlyNotes: data.monthlyNotes || {},
         settings: data.settings || {
           currencySymbol: 'NT$',
           stealthMode: false,
@@ -221,6 +255,9 @@ export const subscribeToUserData = (
         categories: [],
         assets: [],
         records: [],
+        transactions: [],
+        monthlyPrices: {},
+        monthlyNotes: {},
         settings: {
           currencySymbol: 'NT$',
           stealthMode: false,

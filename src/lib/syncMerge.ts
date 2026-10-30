@@ -1,4 +1,4 @@
-import { MonthlyRecord, Category, Asset, AppSettings } from '../types';
+import { MonthlyRecord, Category, Asset, AppSettings, LedgerTransaction, MonthlyPriceMap } from '../types';
 import { recalculateMonthlyRecords } from './storage';
 
 /**
@@ -244,4 +244,55 @@ export function mergeSettings(
     defaultChartType: cloudSettings?.defaultChartType || deviceSettings?.defaultChartType || 'all',
     defaultGroupMode: cloudSettings?.defaultGroupMode || deviceSettings?.defaultGroupMode || 'category',
   };
+}
+
+export function mergeTransactions(
+  cloudTx: LedgerTransaction[] = [],
+  deviceTx: LedgerTransaction[] = []
+): LedgerTransaction[] {
+  const cloudMap = new Map<string, LedgerTransaction>();
+  (cloudTx || []).forEach((t) => {
+    if (t && t.id) cloudMap.set(t.id, t);
+  });
+
+  const deviceMap = new Map<string, LedgerTransaction>();
+  (deviceTx || []).forEach((t) => {
+    if (t && t.id) deviceMap.set(t.id, t);
+  });
+
+  const allIds = Array.from(new Set([...cloudMap.keys(), ...deviceMap.keys()]));
+  const result: LedgerTransaction[] = [];
+
+  for (const id of allIds) {
+    const c = cloudMap.get(id);
+    const d = deviceMap.get(id);
+    if (c && !d) {
+      result.push(c);
+    } else if (!c && d) {
+      result.push(d);
+    } else if (c && d) {
+      const cTime = c.updatedAt ? new Date(c.updatedAt).getTime() : c.createdAt ? new Date(c.createdAt).getTime() : 0;
+      const dTime = d.updatedAt ? new Date(d.updatedAt).getTime() : d.createdAt ? new Date(d.createdAt).getTime() : 0;
+      result.push(dTime > cTime ? d : c);
+    }
+  }
+
+  // Sort by date ascending
+  return result.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export function mergeMonthlyPrices(
+  cloudPrices: MonthlyPriceMap = {},
+  devicePrices: MonthlyPriceMap = {}
+): MonthlyPriceMap {
+  const result: MonthlyPriceMap = { ...(cloudPrices || {}) };
+
+  for (const month of Object.keys(devicePrices || {})) {
+    result[month] = {
+      ...(result[month] || {}),
+      ...(devicePrices[month] || {}),
+    };
+  }
+
+  return result;
 }

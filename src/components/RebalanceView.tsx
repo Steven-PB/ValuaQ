@@ -18,8 +18,8 @@ import {
   ShieldAlert
 } from 'lucide-react';
 import { Category, Asset, MonthlyRecord, RebalanceMode } from '../types';
-import { calculateRebalance, getTargetPresets } from '../lib/rebalanceEngine';
-import { formatCurrency, formatPercent, formatNumberWithCommas, parseFormattedNumber } from '../lib/formatters';
+import { calculateRebalance, getTargetPresets, isEmergencyFundCategory } from '../lib/rebalanceEngine';
+import { formatCurrency, formatPercent, formatNumberWithCommas, parseFormattedNumber, isLiveMonth, formatMonthName } from '../lib/formatters';
 
 interface RebalanceViewProps {
   categories: Category[];
@@ -31,13 +31,18 @@ interface RebalanceViewProps {
 }
 
 export const RebalanceView: React.FC<RebalanceViewProps> = ({
-  categories,
+  categories: allCategories,
   assets,
   records,
   currencySymbol,
   stealthMode,
   onUpdateCategoryTargets,
 }) => {
+  // Rule 4: Exclude Emergency Fund safety net categories from portfolio rebalancing
+  const categories = useMemo(() => {
+    return allCategories.filter((c) => !isEmergencyFundCategory(c, assets));
+  }, [allCategories, assets]);
+
   // Get the most recent month record
   const latestRecord = useMemo(() => {
     if (!records || records.length === 0) return undefined;
@@ -236,9 +241,9 @@ export const RebalanceView: React.FC<RebalanceViewProps> = ({
 
   // Save targets to categories and persist to storage / cloud
   const handleSaveTargets = () => {
-    const updated = categories.map((cat) => ({
+    const updated = allCategories.map((cat) => ({
       ...cat,
-      targetPercent: localTargets[cat.id] ?? 0,
+      targetPercent: isEmergencyFundCategory(cat, assets) ? 0 : (localTargets[cat.id] ?? 0),
       updatedAt: new Date().toISOString(),
     }));
     onUpdateCategoryTargets(updated);
@@ -262,9 +267,25 @@ export const RebalanceView: React.FC<RebalanceViewProps> = ({
             <div>
               <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
                 Portfolio Rebalancing
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
-                  {latestRecord ? `Latest: ${latestRecord.month}` : 'No Records Yet'}
-                </span>
+                {latestRecord ? (
+                  latestRecord.isLivePending || isLiveMonth(latestRecord.month) ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                      </span>
+                      <span>Live</span>
+                    </span>
+                  ) : (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                      {formatMonthName(latestRecord.month)}
+                    </span>
+                  )
+                ) : (
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                    No Records Yet
+                  </span>
+                )}
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
                 Maintain optimal risk-adjusted asset allocation and deploy new capital without emotional bias.
