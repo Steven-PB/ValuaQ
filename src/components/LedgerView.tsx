@@ -83,10 +83,10 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
   // Delete Confirmation
   const [deletingTxId, setDeletingTxId] = useState<string | null>(null);
 
-  // Filter State
-  const [filterMonth, setFilterMonth] = useState<string>('all');
-  const [filterAction, setFilterAction] = useState<'all' | 'add' | 'convert' | 'withdraw' | 'dividend'>('all');
-  const [filterAssetId, setFilterAssetId] = useState<string>('all');
+  // Filter State (Multi-select: empty array means 'All')
+  const [filterMonths, setFilterMonths] = useState<string[]>([]);
+  const [filterActions, setFilterActions] = useState<TransactionType[]>([]);
+  const [filterAssetIds, setFilterAssetIds] = useState<string[]>([]);
   const [sortAsc, setSortAsc] = useState<boolean>(false); // default: newest date first
 
   // Unique month categories present in transactions
@@ -119,20 +119,24 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
   }, [categories]);
 
   // Month expand / collapse state
-  // Default is 'hide' (false) when 'all' months is selected; 'show' (true) when a certain month is selected
+  // Default is 'hide' (false) when 'all' months is selected; 'show' (true) when specific months are selected
   const [expandedMonths, setExpandedMonths] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    if (filterMonth === 'all') {
+    if (filterMonths.length === 0) {
       setExpandedMonths({});
     } else {
-      setExpandedMonths({ [filterMonth]: true });
+      const next: Record<string, boolean> = {};
+      filterMonths.forEach((m) => {
+        next[m] = true;
+      });
+      setExpandedMonths(next);
     }
-  }, [filterMonth]);
+  }, [filterMonths]);
 
   const toggleMonthExpand = (monthKey: string) => {
     setExpandedMonths((prev) => {
-      const isDefaultExpanded = filterMonth !== 'all';
+      const isDefaultExpanded = filterMonths.length > 0;
       const current = prev[monthKey] ?? isDefaultExpanded;
       return {
         ...prev,
@@ -545,14 +549,17 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
   // Filter and sort transactions for display
   const filteredTransactions = useMemo(() => {
     return transactions.filter((tx) => {
-      if (filterAction !== 'all' && tx.action !== filterAction) return false;
-      if (filterAssetId !== 'all') {
-        if (tx.fromAssetId !== filterAssetId && tx.toAssetId !== filterAssetId) {
+      if (filterActions.length > 0 && !filterActions.includes(tx.action)) return false;
+      if (filterAssetIds.length > 0) {
+        const matchFrom = tx.fromAssetId ? filterAssetIds.includes(tx.fromAssetId) : false;
+        const matchTo = tx.toAssetId ? filterAssetIds.includes(tx.toAssetId) : false;
+        if (!matchFrom && !matchTo) {
           return false;
         }
       }
-      if (filterMonth !== 'all') {
-        if (!tx.date.startsWith(filterMonth)) {
+      if (filterMonths.length > 0) {
+        const txMonth = tx.date && tx.date.length >= 7 ? tx.date.slice(0, 7) : '';
+        if (!filterMonths.includes(txMonth)) {
           return false;
         }
       }
@@ -575,7 +582,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
       const idB = b.id || '';
       return sortAsc ? idA.localeCompare(idB) : idB.localeCompare(idA);
     });
-  }, [transactions, filterAction, filterAssetId, filterMonth, sortAsc]);
+  }, [transactions, filterActions, filterAssetIds, filterMonths, sortAsc]);
 
   // Group filtered transactions into month categories
   const groupedTransactionsByMonth = useMemo(() => {
@@ -1104,33 +1111,52 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
-            {/* Month Category Filter */}
+            {/* Month Category Filter (Multi-Choice) */}
             <CustomDropdown
-              value={filterMonth}
-              onChange={(val) => setFilterMonth(val)}
+              multiple
+              selectedValues={filterMonths}
+              onMultiChange={(vals) => setFilterMonths(vals)}
               options={monthFilterOptions}
-              className="w-36 sm:w-44"
-              maxHeight="max-h-60"
+              className="w-40 sm:w-48"
+              maxHeight="max-h-64"
             />
 
-            {/* Action Filter */}
+            {/* Action Filter (Multi-Choice) */}
             <CustomDropdown
-              value={filterAction}
-              onChange={(val) => setFilterAction(val as any)}
+              multiple
+              selectedValues={filterActions}
+              onMultiChange={(vals) => setFilterActions(vals as TransactionType[])}
               options={actionFilterOptions}
-              className="w-32 sm:w-36"
-              maxHeight="max-h-60"
+              className="w-36 sm:w-40"
+              maxHeight="max-h-64"
             />
 
-            {/* Asset Filter */}
+            {/* Asset Filter (Multi-Choice) */}
             <CustomDropdown
-              value={filterAssetId}
-              onChange={(val) => setFilterAssetId(val)}
+              multiple
+              selectedValues={filterAssetIds}
+              onMultiChange={(vals) => setFilterAssetIds(vals)}
               options={assetFilterOptions}
-              className="w-36 sm:w-44"
-              maxHeight="max-h-60"
+              className="w-40 sm:w-48"
+              maxHeight="max-h-64"
               enableSearch={assets.length >= 6}
             />
+
+            {(filterMonths.length > 0 || filterActions.length > 0 || filterAssetIds.length > 0) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterMonths([]);
+                  setFilterActions([]);
+                  setFilterAssetIds([]);
+                }}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0"
+                title="Clear all active filters"
+              >
+                <X className="w-3 h-3" />
+                <span>Clear</span>
+              </button>
+            )}
 
             {/* Sort Order Button (Ascending or Descending) */}
             <button
@@ -1176,28 +1202,51 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
               {groupedTransactionsByMonth.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-12 text-center text-slate-500">
-                    <div className="flex flex-col items-center justify-center space-y-3">
-                      <div className="w-10 h-10 rounded-lg bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-slate-400">
-                        <Coins className="w-5 h-5" />
-                      </div>
-                      <div className="text-sm font-semibold text-slate-300">No transactions recorded yet</div>
-                      <p className="text-xs text-slate-500 max-w-sm">
-                        Use <strong>Record</strong> above to deposit capital into your cash asset, convert cash into stocks, ETFs, gold, or crypto, or log dividends &amp; interest.
-                      </p>
-                      {assets.length === 0 && onOpenHierarchyTab && (
+                    {transactions.length > 0 && (filterMonths.length > 0 || filterActions.length > 0 || filterAssetIds.length > 0) ? (
+                      <div className="flex flex-col items-center justify-center space-y-3">
+                        <div className="w-10 h-10 rounded-lg bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-slate-400">
+                          <Filter className="w-5 h-5" />
+                        </div>
+                        <div className="text-sm font-semibold text-slate-300">No transactions match the selected filters</div>
+                        <p className="text-xs text-slate-500 max-w-sm">
+                          Try adjusting or resetting your Month, Action, or Asset multi-select filters.
+                        </p>
                         <button
-                          onClick={onOpenHierarchyTab}
-                          className="mt-2 text-xs font-semibold text-emerald-400 hover:text-emerald-300 underline cursor-pointer"
+                          type="button"
+                          onClick={() => {
+                            setFilterMonths([]);
+                            setFilterActions([]);
+                            setFilterAssetIds([]);
+                          }}
+                          className="mt-1 px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-xs font-semibold text-emerald-400 transition-colors cursor-pointer"
                         >
-                          &rarr; Go to Assets &amp; Risk Hierarchy to add assets first
+                          Reset All Filters
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center space-y-3">
+                        <div className="w-10 h-10 rounded-lg bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-slate-400">
+                          <Coins className="w-5 h-5" />
+                        </div>
+                        <div className="text-sm font-semibold text-slate-300">No transactions recorded yet</div>
+                        <p className="text-xs text-slate-500 max-w-sm">
+                          Use <strong>Record</strong> above to deposit capital into your cash asset, convert cash into stocks, ETFs, gold, or crypto, or log dividends &amp; interest.
+                        </p>
+                        {assets.length === 0 && onOpenHierarchyTab && (
+                          <button
+                            onClick={onOpenHierarchyTab}
+                            className="mt-2 text-xs font-semibold text-emerald-400 hover:text-emerald-300 underline cursor-pointer"
+                          >
+                            &rarr; Go to Assets &amp; Risk Hierarchy to add assets first
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </td>
                 </tr>
               ) : (
                 groupedTransactionsByMonth.map((group) => {
-                  const isExpanded = expandedMonths[group.monthKey] ?? (filterMonth !== 'all');
+                  const isExpanded = expandedMonths[group.monthKey] ?? (filterMonths.length > 0);
 
                   return (
                     <React.Fragment key={group.monthKey}>
