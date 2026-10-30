@@ -37,6 +37,7 @@ import {
   fetchHistoricalPriceForDate
 } from './lib/marketPriceEngine';
 import { Category, Asset, MonthlyRecord, AppSettings, FilterState, RiskLevel, ChartType, LedgerTransaction, MonthlyPriceMap, MonthlyNotesMap } from './types';
+import { normalizeCurrencyCode, getCurrencySymbolForCode } from './lib/formatters';
 import { 
   auth, 
   signInWithGoogle, 
@@ -1078,7 +1079,15 @@ export default function App() {
 
   const handleUpdateSettings = (newSettings: Partial<AppSettings>) => {
     setSettings((prev) => {
-      const updated = { ...prev, ...newSettings, currencySymbol: 'NT$' };
+      const merged = { ...prev, ...newSettings };
+      const baseCode = normalizeCurrencyCode(
+        newSettings.baseCurrency || newSettings.currencySymbol || merged.baseCurrency || merged.currencySymbol || 'NTD'
+      );
+      const updated: AppSettings = {
+        ...merged,
+        baseCurrency: baseCode,
+        currencySymbol: getCurrencySymbolForCode(baseCode),
+      };
       triggerCloudUpload(categories, assets, transactions, monthlyPrices, updated, false, monthlyNotes);
       return updated;
     });
@@ -1295,6 +1304,7 @@ export default function App() {
         name: a.name,
         tickerSymbol: a.tickerSymbol,
         currency: a.currency,
+        priceCurrency: a.priceCurrency,
         isCash: isCashAst,
         categoryId: a.categoryId,
         categoryName: cat?.name || 'Uncategorized',
@@ -1941,6 +1951,7 @@ export default function App() {
             filters={filters}
             chartType={chartType}
             onChartTypeChange={setChartType}
+            onEditAsset={handleEditAsset}
           />
         )}
 
@@ -1975,6 +1986,7 @@ export default function App() {
             onDuplicateRecord={handleDuplicateRecord}
             onUpdateMonthPrice={handleUpdateMonthPrice}
             onUpdateMonthNote={handleUpdateMonthNote}
+            onEditAsset={handleEditAsset}
           />
         )}
 
@@ -2086,7 +2098,9 @@ export default function App() {
       <footer className="border-t border-slate-900/90 bg-[#080C14] py-6 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>ValuaQ <span aria-hidden="true">·</span> Quantity-Based Wealth &amp; Risk Engine</span>
-          <span className="text-slate-600">Base Currency: NTD (NT$)</span>
+          <span className="text-slate-500 font-mono">
+            Base Currency: {normalizeCurrencyCode(settings.baseCurrency || settings.currencySymbol || 'NTD')} ({settings.currencySymbol})
+          </span>
         </div>
       </footer>
 

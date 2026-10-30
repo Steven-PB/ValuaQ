@@ -16,11 +16,13 @@ import {
   Coins,
   Activity,
   AlertTriangle,
-  CheckCircle2
+  CheckCircle2,
+  Globe
 } from 'lucide-react';
 import { AppSettings } from '../types';
 import { User } from '../lib/firebase';
 import { SyncHealthReport } from '../lib/syncMerge';
+import { SUPPORTED_BASE_CURRENCIES, normalizeCurrencyCode, getCurrencySymbolForCode } from '../lib/formatters';
 
 interface HeaderProps {
   activeTab: 'dashboard' | 'ledger' | 'spreadsheet' | 'hierarchy' | 'rebalance';
@@ -69,6 +71,7 @@ export const Header: React.FC<HeaderProps> = ({
   ];
 
   const isDrift = syncHealth?.status === 'drift_detected';
+  const activeBaseCurrency = normalizeCurrencyCode(settings.baseCurrency || settings.currencySymbol || 'NTD');
 
   return (
     <header className="bg-[#080C14]/95 backdrop-blur-md border-b border-slate-800/80 text-slate-100 sticky top-0 z-30">
@@ -111,10 +114,31 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Zone 3: Workspace Utilities & Cloud Sync */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {/* Base Currency Indicator (Unboxed quiet inline label on desktop) */}
-            <span className="hidden xl:inline-block text-[11px] font-mono text-slate-500 mr-1 whitespace-nowrap">
-              Base: <strong className="text-slate-300 font-semibold">NTD (NT$)</strong>
-            </span>
+            {/* Multi-Currency Base Selector */}
+            <label
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#0D131F] border border-slate-800 hover:border-emerald-500/40 text-xs font-medium transition-all shrink-0 cursor-pointer"
+              title="Switch Portfolio Multi-Currency Base (converts all totals, KPIs, charts & spreadsheets)"
+            >
+              <Globe className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span className="hidden xl:inline text-[11px] font-mono text-slate-400">Base:</span>
+              <select
+                value={activeBaseCurrency}
+                onChange={(e) => {
+                  const nextBase = normalizeCurrencyCode(e.target.value);
+                  onUpdateSettings({
+                    baseCurrency: nextBase,
+                    currencySymbol: getCurrencySymbolForCode(nextBase),
+                  });
+                }}
+                className="bg-transparent text-emerald-300 font-mono font-bold text-xs focus:outline-none cursor-pointer pr-0.5"
+              >
+                {SUPPORTED_BASE_CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code} className="bg-slate-900 text-slate-100">
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </label>
 
             {/* Stealth Mode Toggle */}
             <button

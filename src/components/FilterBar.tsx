@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { CheckSquare, Square, Search, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import { Category, Asset, RiskLevel, FilterState } from '../types';
-import { formatCurrency } from '../lib/formatters';
+import { formatCurrency, formatAssetUnitPrice } from '../lib/formatters';
 import { getAssetBasePrice } from '../lib/ledgerEngine';
 
 interface FilterBarProps {
@@ -335,7 +335,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                       <>
                         <span className="text-slate-600" aria-hidden="true">·</span>
                         <span className="text-[11px] font-mono tabular-nums text-emerald-400 font-semibold">
-                          {formatCurrency(unitPrice, currencySymbol, stealthMode)}
+                          {formatAssetUnitPrice(unitPrice, asset, stealthMode)}
                         </span>
                       </>
                     )}

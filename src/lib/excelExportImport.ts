@@ -1,6 +1,11 @@
 import * as XLSX from 'xlsx';
 import { Category, Asset, MonthlyRecord, AppSettings } from '../types';
 import { getAssetBasePrice } from './ledgerEngine';
+import {
+  resolveCurrencyCodeFromSymbolOrCode,
+  convertPriceFromNTD,
+  getAssetPriceCurrency,
+} from './formatters';
 
 /**
  * Formats standard header for an asset with its category:
@@ -24,11 +29,13 @@ export function generateExcelWorkbook(
   categories: Category[],
   assets: Asset[],
   records: MonthlyRecord[],
-  _settings: AppSettings
+  settings: AppSettings
 ): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
   const sortedRecords = [...records].sort((a, b) => a.month.localeCompare(b.month));
   const catMap = new Map<string, Category>(categories.map((c) => [c.id, c]));
+  const baseCode = resolveCurrencyCodeFromSymbolOrCode(settings?.baseCurrency || settings?.currencySymbol || 'NTD');
+  const toBase = (valNtd: number) => Math.round(convertPriceFromNTD(valNtd, baseCode) * 100) / 100;
 
   // 1. Build Monthly Asset & Quantity Spreadsheet Sheet Data
   const monthlyRows = sortedRecords.map((rec) => {
@@ -44,13 +51,14 @@ export function generateExcelWorkbook(
 
     const row: Record<string, any> = {
       'Month': rec.month,
-      'Total Assets': Math.round(totalAssetVal),
-      'Emergency Fund': Math.round(emergencyFundVal),
-      'Total Capital': Math.round(totalCapitalVal),
-      'Monthly Deposit': Math.round(rec.monthlyMoneyInvested || 0),
-      'Monthly Yield': Math.round(rec.monthlyDividendIncome || 0),
-      'Total Invested': Math.round(cumulativeInvested),
-      'Floating P&L': Math.round(floatingPL),
+      'Base Currency': baseCode,
+      'Total Assets': toBase(totalAssetVal),
+      'Emergency Fund': toBase(emergencyFundVal),
+      'Total Capital': toBase(totalCapitalVal),
+      'Monthly Deposit': toBase(rec.monthlyMoneyInvested || 0),
+      'Monthly Yield': toBase(rec.monthlyDividendIncome || 0),
+      'Total Invested': toBase(cumulativeInvested),
+      'Floating P&L': toBase(floatingPL),
       'Floating P&L %': `${floatingPLPercent >= 0 ? '+' : ''}${floatingPLPercent.toFixed(2)}%`,
     };
 
@@ -60,11 +68,13 @@ export function generateExcelWorkbook(
       const catName = cat?.name;
       const val = rec.assetValues?.[ast.id] ?? 0;
       const qty = rec.assetQuantities?.[ast.id] ?? 0;
-      const price = getAssetBasePrice(ast, rec.assetPrices);
+      const priceNtd = getAssetBasePrice(ast, rec.assetPrices);
+      const priceCurr = getAssetPriceCurrency(ast);
+      const displayPrice = Math.round(convertPriceFromNTD(priceNtd, priceCurr) * 10000) / 10000;
 
-      row[formatAssetColumnHeader(catName, ast.name, 'Value')] = Math.round(val);
+      row[formatAssetColumnHeader(catName, ast.name, 'Value')] = toBase(val);
       row[formatAssetColumnHeader(catName, ast.name, 'Qty')] = qty;
-      row[formatAssetColumnHeader(catName, ast.name, 'Price')] = price;
+      row[formatAssetColumnHeader(catName, `${ast.name} [${priceCurr}]`, 'Price')] = displayPrice;
     });
 
     const assetNotesArray = rec.assetNotes 

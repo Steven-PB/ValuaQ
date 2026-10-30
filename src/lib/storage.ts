@@ -1,5 +1,6 @@
 import { Category, Asset, MonthlyRecord, AppSettings, LedgerTransaction, MonthlyPriceMap, MonthlyNotesMap } from '../types';
 import { initialCategories, initialAssets, initialMonthlyRecords, initialSettings } from '../data/initialData';
+import { normalizeCurrencyCode, getCurrencySymbolForCode } from './formatters';
 
 const STORAGE_KEYS = {
   CATEGORIES: 'valuaq_categories_v4_zero',
@@ -255,12 +256,19 @@ export function loadSettings(): AppSettings {
     const raw = localStorage.getItem(STORAGE_KEYS.SETTINGS);
     if (raw) {
       const parsed = JSON.parse(raw);
-      return { ...parsed, currencySymbol: 'NT$' };
+      const baseCode = normalizeCurrencyCode(parsed?.baseCurrency || parsed?.currencySymbol || 'NTD');
+      const sym = getCurrencySymbolForCode(baseCode);
+      return {
+        ...initialSettings,
+        ...parsed,
+        baseCurrency: baseCode,
+        currencySymbol: sym,
+      };
     }
   } catch (e) {
     console.error('Failed to load settings from storage', e);
   }
-  return { ...initialSettings, currencySymbol: 'NT$' };
+  return { ...initialSettings, baseCurrency: 'NTD', currencySymbol: 'NT$' };
 }
 
 export function saveSettings(settings: AppSettings): void {
@@ -347,8 +355,18 @@ export function parseAndValidateBackupJson(jsonString: string): {
         : [],
       settings:
         parsed.settings && typeof parsed.settings === 'object'
-          ? { ...initialSettings, ...parsed.settings, currencySymbol: 'NT$' }
-          : { ...initialSettings, currencySymbol: 'NT$' },
+          ? (() => {
+              const bCode = normalizeCurrencyCode(
+                parsed.settings.baseCurrency || parsed.settings.currencySymbol || 'NTD'
+              );
+              return {
+                ...initialSettings,
+                ...parsed.settings,
+                baseCurrency: bCode,
+                currencySymbol: getCurrencySymbolForCode(bCode),
+              };
+            })()
+          : { ...initialSettings, baseCurrency: 'NTD', currencySymbol: 'NT$' },
     };
     return { valid: true, data: normalized };
   } catch (e: any) {

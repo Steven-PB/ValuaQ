@@ -18,7 +18,7 @@ import {
   DollarSign
 } from 'lucide-react';
 import { Category, Asset, RiskLevel, MonthlyRecord } from '../types';
-import { getRiskLevelBadgeClass, formatCurrency, parseFormattedNumber } from '../lib/formatters';
+import { getRiskLevelBadgeClass, formatCurrency, parseFormattedNumber, SUPPORTED_PRICE_CURRENCIES, getAssetPriceCurrency, formatAssetUnitPrice } from '../lib/formatters';
 import { AVAILABLE_ASSETS_CATALOG, CatalogAssetTemplate } from '../data/availableAssetsCatalog';
 import { searchLiveMarketAssets, fetchLiveMarketQuotes, MarketSearchResult } from '../lib/marketPriceEngine';
 import { CustomDropdown } from './CustomDropdown';
@@ -39,6 +39,9 @@ export function formatOriginalPrice(price?: number, currency: string = 'NTD'): s
   }
   if (curr === 'EUR') {
     return `€${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EUR`;
+  }
+  if (curr === 'IDR') {
+    return `Rp ${price.toLocaleString(undefined, { maximumFractionDigits: 0 })} IDR`;
   }
   if (curr === 'GBP') {
     return `£${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} GBP`;
@@ -189,6 +192,7 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
   const [astName, setAstName] = useState('');
   const [astCatId, setAstCatId] = useState('');
   const [astCurrency, setAstCurrency] = useState('NTD');
+  const [astPriceCurrency, setAstPriceCurrency] = useState('NTD');
   const [astDesc, setAstDesc] = useState('');
   const [astIsCash, setAstIsCash] = useState(false);
   const [astIsEmergencyFund, setAstIsEmergencyFund] = useState(false);
@@ -580,6 +584,7 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
       setAstCatId(ast.categoryId);
       const curr = (ast.currency || 'NTD').toUpperCase();
       setAstCurrency(curr);
+      setAstPriceCurrency(getAssetPriceCurrency(ast));
       setAstDesc(ast.description || '');
       setAstIsCash(!!ast.isCash);
       setAstIsEmergencyFund(!!ast.isEmergencyFund);
@@ -627,6 +632,7 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
       setAstName('');
       setAstCatId(categories[0]?.id || '');
       setAstCurrency('NTD');
+      setAstPriceCurrency('NTD');
       setAstDesc('');
       setAstIsCash(false);
       setAstIsEmergencyFund(false);
@@ -672,6 +678,7 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
         name: astName,
         categoryId: astCatId,
         currency: astCurrency,
+        priceCurrency: astPriceCurrency,
         description: astDesc,
         isCash: isCashAsset,
         isEmergencyFund: isEmergencyFundAssetFlag,
@@ -683,6 +690,7 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
         name: astName,
         categoryId: astCatId,
         currency: astCurrency,
+        priceCurrency: astPriceCurrency,
         description: astDesc,
         isCash: isCashAsset,
         isEmergencyFund: isEmergencyFundAssetFlag,
@@ -879,23 +887,43 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
                                     </span>
                                   ) : null}
                                 </div>
-                                <div className="text-[10px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+                                <div className="text-[10px] text-slate-500 flex items-center flex-wrap gap-1.5 mt-0.5">
                                   {ast.isCash ? (
                                     <span className="text-emerald-400 font-mono font-medium">
-                                      {formatOriginalPrice(1, ast.currency || 'NTD')} Cash
+                                      {formatAssetUnitPrice(ast.currentPrice || 1, ast)} Cash
                                     </span>
                                   ) : ast.tickerSymbol ? (
                                     <span className="font-mono text-emerald-400 font-medium flex items-center gap-1">
                                       <TrendingUp className="w-2.5 h-2.5" />
-                                      {liveQuotesMap[ast.tickerSymbol]?.price
-                                        ? formatOriginalPrice(liveQuotesMap[ast.tickerSymbol].price, liveQuotesMap[ast.tickerSymbol].currency || ast.currency || 'USD')
-                                        : ast.currentPrice && ast.currentPrice > 1
-                                        ? formatOriginalPrice(ast.currentPrice, ast.currency || 'NTD')
+                                      {liveQuotesMap[ast.tickerSymbol]?.priceNTD
+                                        ? formatAssetUnitPrice(liveQuotesMap[ast.tickerSymbol].priceNTD, ast)
+                                        : ast.currentPrice && ast.currentPrice > 0
+                                        ? formatAssetUnitPrice(ast.currentPrice, ast)
                                         : ast.tickerSymbol}
                                     </span>
                                   ) : (
-                                    <span className="text-slate-400">Self-Managed</span>
+                                    <span className="text-slate-400 font-mono">
+                                      {ast.currentPrice && ast.currentPrice > 0
+                                        ? formatAssetUnitPrice(ast.currentPrice, ast)
+                                        : 'Self-Managed'}
+                                    </span>
                                   )}
+                                  <span className="text-slate-600">&bull;</span>
+                                  <label className="inline-flex items-center gap-1 text-[9px] text-slate-400" title="Choose currency in which this asset's unit price is displayed">
+                                    <span>Show in:</span>
+                                    <select
+                                      value={getAssetPriceCurrency(ast)}
+                                      onChange={(e) => onEditAsset(ast.id, { priceCurrency: e.target.value })}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="bg-slate-900 border border-slate-700/80 hover:border-indigo-500/60 text-indigo-300 font-mono font-bold text-[9px] rounded px-1 py-0.5 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                                    >
+                                      {SUPPORTED_PRICE_CURRENCIES.map((c) => (
+                                        <option key={c.code} value={c.code}>
+                                          {c.code} ({c.symbol})
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
                                 </div>
                               </div>
                             </div>
@@ -1385,6 +1413,7 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
                         <div className="flex flex-wrap gap-1.5">
                           {[
                             { code: 'NTD', label: '🇹🇼 NTD (TWD)' },
+                            { code: 'IDR', label: '🇮🇩 IDR (Rupiah)' },
                             { code: 'USD', label: '🇺🇸 USD' },
                             { code: 'USDT', label: '🪙 USDT (Tether)' },
                             { code: 'USDC', label: '💵 USDC' },
@@ -1401,15 +1430,28 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
                               type="button"
                               onClick={() => {
                                 setAstCurrency(c.code);
+                                setAstPriceCurrency(c.code === 'USDT' || c.code === 'USDC' ? 'USD' : c.code);
                                 if (!astName || astName.startsWith('Cash ')) {
                                   setAstName(`Cash ${c.code}`);
                                 }
                                 if (c.code === 'USD' || c.code === 'USDT' || c.code === 'USDC') {
                                   setAstPrice('32.5');
+                                } else if (c.code === 'IDR') {
+                                  setAstPrice('0.002');
                                 } else if (c.code === 'JPY') {
                                   setAstPrice('0.22');
                                 } else if (c.code === 'EUR') {
                                   setAstPrice('35.0');
+                                } else if (c.code === 'GBP') {
+                                  setAstPrice('42.0');
+                                } else if (c.code === 'CNY') {
+                                  setAstPrice('4.5');
+                                } else if (c.code === 'AUD') {
+                                  setAstPrice('21.5');
+                                } else if (c.code === 'CAD') {
+                                  setAstPrice('23.5');
+                                } else if (c.code === 'SGD') {
+                                  setAstPrice('24.5');
                                 } else {
                                   setAstPrice('1');
                                 }
@@ -1654,6 +1696,7 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
                         <div className="flex flex-wrap gap-1.5">
                           {[
                             { code: 'NTD', label: '🇹🇼 NTD' },
+                            { code: 'IDR', label: '🇮🇩 IDR' },
                             { code: 'USD', label: '🇺🇸 USD' },
                             { code: 'USDT', label: '🪙 USDT' },
                             { code: 'EUR', label: '🇪🇺 EUR' },
@@ -1664,8 +1707,11 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
                               type="button"
                               onClick={() => {
                                 setAstCurrency(c.code);
+                                setAstPriceCurrency(c.code === 'USDT' ? 'USD' : c.code);
                                 if (c.code === 'USD' || c.code === 'USDT') {
                                   setAstPrice('32.5');
+                                } else if (c.code === 'IDR') {
+                                  setAstPrice('0.002');
                                 } else if (c.code === 'JPY') {
                                   setAstPrice('0.22');
                                 } else if (c.code === 'EUR') {
@@ -1710,6 +1756,41 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
                       </div>
                     </div>
                   )}
+                </div>
+
+                {/* Price Display Currency Selector */}
+                <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-slate-200 font-semibold text-xs flex items-center gap-1.5">
+                      <Globe className="w-3.5 h-3.5 text-indigo-400" />
+                      Price Display Currency (Show Asset Price In)
+                    </label>
+                    <span className="text-[10px] font-mono text-indigo-400 bg-indigo-500/10 border border-indigo-500/30 px-2 py-0.5 rounded">
+                      Showing in {astPriceCurrency}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Choose which currency this asset&apos;s unit price is displayed in across the Dashboard, Matrix, and Ledger. Portfolio totals remain unified in your selected Base Currency ({currencySymbol}).
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {SUPPORTED_PRICE_CURRENCIES.map((c) => {
+                      const isSelected = astPriceCurrency === c.code;
+                      return (
+                        <button
+                          key={c.code}
+                          type="button"
+                          onClick={() => setAstPriceCurrency(c.code)}
+                          className={`px-2.5 py-1.5 rounded-lg text-[11px] font-mono font-semibold transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/50 shadow-sm'
+                              : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                          }`}
+                        >
+                          {c.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div>

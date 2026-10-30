@@ -7,6 +7,7 @@ export const initialAssets: Asset[] = [];
 export const initialMonthlyRecords: MonthlyRecord[] = [];
 
 export const initialSettings: AppSettings = {
+  baseCurrency: 'NTD',
   currencySymbol: 'NT$',
   stealthMode: false,
   defaultChartType: 'pie',

@@ -16,7 +16,21 @@ import {
   MessageSquareQuote
 } from 'lucide-react';
 import { Category, Asset, MonthlyRecord } from '../types';
-import { formatCurrency, formatPercent, formatMonthName, formatNumberWithCommas, parseFormattedNumber, isLiveMonth } from '../lib/formatters';
+import {
+  formatCurrency,
+  formatPercent,
+  formatMonthName,
+  formatNumberWithCommas,
+  parseFormattedNumber,
+  isLiveMonth,
+  SUPPORTED_PRICE_CURRENCIES,
+  getAssetPriceCurrency,
+  getCurrencySymbolForCode,
+  convertPriceFromNTD,
+  convertPriceToNTD,
+  formatAssetUnitPrice,
+  resolveCurrencyCodeFromSymbolOrCode,
+} from '../lib/formatters';
 import { downloadExcelFile } from '../lib/excelExportImport';
 import { isEmergencyFundAsset, getAssetBasePrice } from '../lib/ledgerEngine';
 import { CustomDropdown } from './CustomDropdown';
@@ -33,6 +47,7 @@ interface SpreadsheetViewProps {
   onDuplicateRecord?: (record: MonthlyRecord) => void;
   onUpdateMonthPrice?: (month: string, assetId: string, price: number) => void;
   onUpdateMonthNote?: (month: string, monthNote: string, assetNotes?: Record<string, string>) => void;
+  onEditAsset?: (id: string, updated: Partial<Asset>) => void;
 }
 
 export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
@@ -44,6 +59,7 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
   stealthMode,
   onUpdateMonthPrice,
   onUpdateMonthNote,
+  onEditAsset,
 }) => {
   const [sortAsc, setSortAsc] = useState<boolean>(false); // default: latest month first (Descending)
   const [selectedYear, setSelectedYear] = useState<string>('ALL');
@@ -143,8 +159,10 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
       if (isBaseCash) {
         initialInputs[ast.id] = '1';
       } else {
-        const p = getAssetBasePrice(ast, rec.assetPrices);
-        initialInputs[ast.id] = formatNumberWithCommas(p);
+        const pNtd = getAssetBasePrice(ast, rec.assetPrices);
+        const displayCurr = getAssetPriceCurrency(ast);
+        const converted = Math.round(convertPriceFromNTD(pNtd, displayCurr) * 10000) / 10000;
+        initialInputs[ast.id] = formatNumberWithCommas(converted);
       }
     });
     setPriceFormInputs(initialInputs);
@@ -159,7 +177,10 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
 
     Object.entries(priceFormInputs).forEach(([astId, valStr]) => {
       const parsed = parseFormattedNumber(valStr as string);
-      onUpdateMonthPrice(editingPriceMonth, astId, parsed > 0 ? parsed : 1);
+      const ast = activeAssets.find((a) => a.id === astId);
+      const displayCurr = getAssetPriceCurrency(ast);
+      const priceInNTD = convertPriceToNTD(parsed > 0 ? parsed : 1, displayCurr);
+      onUpdateMonthPrice(editingPriceMonth, astId, Math.round(priceInNTD * 10000) / 10000);
     });
 
     setEditingPriceMonth(null);
@@ -508,7 +529,7 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
                               <div className="flex items-center justify-between text-[9px]">
                                 <span className="text-slate-500">{ast.isCash ? 'FX Rate:' : 'Price:'}</span>
                                 <span className="text-emerald-400 font-medium">
-                                  @{formatCurrency(price, currencySymbol, stealthMode)}
+                                  @{formatAssetUnitPrice(price, ast, stealthMode)}
                                 </span>
                               </div>
                             )}
@@ -656,6 +677,9 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
                     );
                   }
 
+                  const displayCurr = getAssetPriceCurrency(ast);
+                  const displaySym = getCurrencySymbolForCode(displayCurr);
+
                   return (
                     <div
                       key={ast.id}
@@ -676,10 +700,39 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
                             <span className="text-[10px] font-mono text-slate-400">({ast.tickerSymbol})</span>
                           ) : null}
                         </div>
+
+                        {onEditAsset && (
+                          <label className="inline-flex items-center gap-1 text-[10px] text-slate-400">
+                            <span>Currency:</span>
+                            <select
+                              value={displayCurr}
+                              onChange={(e) => {
+                                const newCurr = e.target.value;
+                                const curVal = parseFormattedNumber(priceFormInputs[ast.id] || '0');
+                                if (curVal > 0) {
+                                  const inNtd = convertPriceToNTD(curVal, displayCurr);
+                                  const inNew = Math.round(convertPriceFromNTD(inNtd, newCurr) * 10000) / 10000;
+                                  setPriceFormInputs((prev) => ({
+                                    ...prev,
+                                    [ast.id]: formatNumberWithCommas(inNew),
+                                  }));
+                                }
+                                onEditAsset(ast.id, { priceCurrency: newCurr });
+                              }}
+                              className="bg-slate-900 border border-slate-700 text-indigo-300 font-mono font-bold text-[10px] rounded px-1.5 py-0.5 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                            >
+                              {SUPPORTED_PRICE_CURRENCIES.map((c) => (
+                                <option key={c.code} value={c.code}>
+                                  {c.code} ({c.symbol})
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono text-emerald-400 font-semibold">{currencySymbol}</span>
+                        <span className="text-xs font-mono text-emerald-400 font-semibold shrink-0">{displaySym}</span>
                         <input
                           type="text"
                           placeholder="Price on 1st of month"
@@ -690,6 +743,11 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
                           }}
                           className="w-full bg-[#0D131F] border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-emerald-500 font-semibold"
                         />
+                        {displayCurr !== resolveCurrencyCodeFromSymbolOrCode(currencySymbol) && (
+                          <span className="text-[10px] font-mono text-slate-500 shrink-0">
+                            ≈ {formatCurrency(convertPriceToNTD(parseFormattedNumber(priceFormInputs[ast.id] || '0'), displayCurr), currencySymbol, false)}
+                          </span>
+                        )}
                       </div>
                     </div>
                   );

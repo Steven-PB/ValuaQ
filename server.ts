@@ -19,6 +19,7 @@ let fxRatesCache: { rates: Record<string, number>; timestamp: number } = {
     USD: 32.5,
     USDT: 32.5,
     USDC: 32.5,
+    IDR: 0.002,
     EUR: 35.0,
     JPY: 0.215,
     GBP: 42.0,
@@ -76,11 +77,11 @@ async function getFxRates(): Promise<Record<string, number>> {
       baseRates['TWD'] = 1;
       baseRates['NTD'] = 1;
 
-      const crossCurrencies = ['EUR', 'JPY', 'GBP', 'AUD', 'CAD', 'SGD', 'CNY', 'HKD', 'CHF', 'KRW'];
+      const crossCurrencies = ['IDR', 'EUR', 'JPY', 'GBP', 'AUD', 'CAD', 'SGD', 'CNY', 'HKD', 'CHF', 'KRW'];
       for (const cur of crossCurrencies) {
         const curInUsd = data.rates?.[cur];
         if (curInUsd && typeof curInUsd === 'number' && curInUsd > 0) {
-          baseRates[cur] = Math.round((usdToTwd / curInUsd) * 10000) / 10000;
+          baseRates[cur] = Math.round((usdToTwd / curInUsd) * 1000000) / 1000000;
         }
       }
     }

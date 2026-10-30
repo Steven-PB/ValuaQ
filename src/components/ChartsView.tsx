@@ -44,6 +44,11 @@ import {
   formatPercent,
   getRiskLevelColor,
   isLiveMonth,
+  SUPPORTED_PRICE_CURRENCIES,
+  getAssetPriceCurrency,
+  formatAssetUnitPrice,
+  resolveCurrencyCodeFromSymbolOrCode,
+  normalizeCurrencyCode,
 } from '../lib/formatters';
 import { isEmergencyFundAsset, getAssetBasePrice } from '../lib/ledgerEngine';
 import { CustomDropdown } from './CustomDropdown';
@@ -58,6 +63,7 @@ interface ChartsViewProps {
   filters?: FilterState;
   chartType?: ChartType;
   onChartTypeChange?: (type: ChartType) => void;
+  onEditAsset?: (id: string, updated: Partial<Asset>) => void;
 }
 
 export const ChartsView: React.FC<ChartsViewProps> = ({
@@ -70,6 +76,7 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
   filters,
   chartType: externalChartType,
   onChartTypeChange,
+  onEditAsset,
 }) => {
   const [internalChartType, setInternalChartType] = useState<ChartType>('all');
   const chartType = externalChartType ?? internalChartType;
@@ -318,6 +325,7 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
             name: a.name,
             tickerSymbol: a.tickerSymbol,
             currency: a.currency,
+            priceCurrency: getAssetPriceCurrency(a),
             isCash: Boolean(a.isCash || cat?.isCashCategory),
             isBaseCash,
             unitPrice,
@@ -338,6 +346,7 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
             name: 'Emergency Fund',
             tickerSymbol: 'TWD',
             currency: 'NTD',
+            priceCurrency: 'NTD',
             isCash: true,
             isBaseCash: true,
             unitPrice: 1,
@@ -851,7 +860,7 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
                 )}
               </div>
               <span className="text-[11px] font-mono tabular-nums text-slate-500">
-                Unit Valuation in {currencySymbol}
+                Per-Asset Display Currency (Selectable)
               </span>
             </div>
 
@@ -863,7 +872,9 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
                   const price = getAssetBasePrice(ast, activeMonthRecord.assetPrices);
                   const qty = activeMonthRecord.assetQuantities?.[ast.id] ?? 0;
                   const curr = (ast.currency || 'NTD').toUpperCase();
-                  const isBaseCash = Boolean(ast.isCash && (curr === 'NTD' || curr === 'TWD'));
+                  const displayCurr = getAssetPriceCurrency(ast);
+                  const activeBaseCode = resolveCurrencyCodeFromSymbolOrCode(currencySymbol);
+                  const isBaseCash = Boolean(ast.isCash && normalizeCurrencyCode(curr) === activeBaseCode && displayCurr === activeBaseCode);
 
                   // Compare against previous month price if available
                   const curRecIdx = records.findIndex((r) => r.month === activeMonthRecord.month);
@@ -895,8 +906,25 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
                               </span>
                             )}
                           </div>
-                          <div className="text-[10px] text-slate-500 truncate font-mono tabular-nums">
-                            {cat?.name || 'Asset'} · Qty {stealthMode ? '•••' : formatNumberWithCommas(qty)}
+                          <div className="text-[10px] text-slate-500 truncate font-mono tabular-nums flex items-center gap-1.5 mt-0.5">
+                            <span className="truncate">
+                              {cat?.name || 'Asset'} · Qty {stealthMode ? '•••' : formatNumberWithCommas(qty)}
+                            </span>
+                            {onEditAsset && (
+                              <select
+                                value={displayCurr}
+                                onChange={(e) => onEditAsset(ast.id, { priceCurrency: e.target.value })}
+                                onClick={(e) => e.stopPropagation()}
+                                title="Change display currency for this asset's price"
+                                className="bg-slate-900 border border-slate-700/80 hover:border-indigo-500/60 text-indigo-300 font-mono font-bold text-[9px] rounded px-1 py-0.2 focus:outline-none focus:border-indigo-500 cursor-pointer shrink-0"
+                              >
+                                {SUPPORTED_PRICE_CURRENCIES.map((c) => (
+                                  <option key={c.code} value={c.code}>
+                                    {c.code}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -905,8 +933,13 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
                         <div className="text-xs font-bold text-emerald-400">
                           {isBaseCash
                             ? `${currencySymbol} 1 (Base)`
-                            : formatCurrency(price, currencySymbol, stealthMode)}
+                            : formatAssetUnitPrice(price, ast, stealthMode)}
                         </div>
+                        {displayCurr !== activeBaseCode && !stealthMode && (
+                          <div className="text-[9px] text-slate-500">
+                            ≈ {formatCurrency(price, currencySymbol, stealthMode)}
+                          </div>
+                        )}
                         {!isBaseCash && Math.abs(priceDeltaPct) > 0.01 ? (
                           <div
                             className={`text-[10px] font-semibold ${
@@ -917,7 +950,7 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
                           </div>
                         ) : (
                           <div className="text-[10px] text-slate-500">
-                            {ast.isCash ? `${curr} Rate` : 'Unit Price'}
+                            {ast.isCash ? `${curr} Rate` : `Unit (${displayCurr})`}
                           </div>
                         )}
                       </div>
@@ -1062,9 +1095,9 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
                               {data.unitPrice !== undefined && (
                                 <div className="text-[11px] font-mono text-emerald-400 font-semibold">
                                   Unit Price:{' '}
-                                  {data.isBaseCash
+                                  {data.isBaseCash && (data.priceCurrency || 'NTD') === 'NTD'
                                     ? `${currencySymbol} 1 (Base)`
-                                    : formatCurrency(data.unitPrice, currencySymbol, stealthMode)}
+                                    : formatAssetUnitPrice(data.unitPrice, data.priceCurrency || 'NTD', stealthMode)}
                                   {data.quantity !== undefined && (
                                     <span className="text-slate-400 font-normal">
                                       {' '}· Qty: {stealthMode ? '••••' : formatNumberWithCommas(data.quantity)}
@@ -1158,7 +1191,7 @@ export const ChartsView: React.FC<ChartsViewProps> = ({
                               <>
                                 {' '}<span aria-hidden="true">·</span>{' '}
                                 <span className="font-mono text-emerald-400 font-medium">
-                                  Price: {item.isBaseCash ? `${currencySymbol} 1` : formatCurrency(item.unitPrice, currencySymbol, stealthMode)}
+                                  Price: {item.isBaseCash && (item.priceCurrency || 'NTD') === 'NTD' ? `${currencySymbol} 1` : formatAssetUnitPrice(item.unitPrice, item.priceCurrency || 'NTD', stealthMode)}
                                 </span>
                               </>
                             )}

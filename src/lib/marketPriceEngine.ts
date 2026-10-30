@@ -101,6 +101,47 @@ export async function fetchHistoricalPriceForDate(
   return null;
 }
 
+const FX_RATES_CACHE_KEY = 'valuaq_fx_rates_cache_v1';
+
+export function loadCachedFxRates(): Record<string, number> {
+  const defaults: Record<string, number> = {
+    USD: 32.5,
+    USDT: 32.5,
+    USDC: 32.5,
+    IDR: 0.002,
+    EUR: 35.0,
+    JPY: 0.215,
+    GBP: 42.0,
+    AUD: 21.5,
+    CAD: 23.5,
+    SGD: 24.5,
+    CNY: 4.5,
+    HKD: 4.15,
+    NTD: 1,
+    TWD: 1,
+  };
+  try {
+    const raw = localStorage.getItem(FX_RATES_CACHE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        return { ...defaults, ...parsed, NTD: 1, TWD: 1 };
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load FX rates cache', e);
+  }
+  return defaults;
+}
+
+export function saveCachedFxRates(rates: Record<string, number>): void {
+  try {
+    localStorage.setItem(FX_RATES_CACHE_KEY, JSON.stringify({ ...rates, NTD: 1, TWD: 1 }));
+  } catch (e) {
+    console.error('Failed to save FX rates cache', e);
+  }
+}
+
 /**
  * Fetches real-time FX currency conversion rates relative to NTD (TWD).
  */
@@ -110,31 +151,26 @@ export async function fetchLiveFxRates(): Promise<Record<string, number>> {
     if (res.ok) {
       const data = await res.json();
       if (data.rates && typeof data.rates === 'object') {
+        saveCachedFxRates(data.rates);
         return data.rates;
       }
       if (data.USD_TWD) {
-        return {
+        const nextRates = {
+          ...loadCachedFxRates(),
           USD: data.USD_TWD,
           USDT: data.USD_TWD,
           USDC: data.USD_TWD,
           NTD: 1,
           TWD: 1,
         };
+        saveCachedFxRates(nextRates);
+        return nextRates;
       }
     }
   } catch (err) {
     console.warn('Failed to fetch live FX rates:', err);
   }
-  return {
-    USD: 32.5,
-    USDT: 32.5,
-    USDC: 32.5,
-    EUR: 35.0,
-    JPY: 0.215,
-    GBP: 42.0,
-    NTD: 1,
-    TWD: 1,
-  };
+  return loadCachedFxRates();
 }
 
 /**
@@ -148,16 +184,7 @@ export async function fetchLiveMarketPrices(
   const updatedPrices: Record<string, number> = { ...currentCache };
 
   // Fetch live FX rates table
-  let fxRates: Record<string, number> = {
-    USD: 32.5,
-    USDT: 32.5,
-    USDC: 32.5,
-    EUR: 35.0,
-    JPY: 0.215,
-    GBP: 42.0,
-    NTD: 1,
-    TWD: 1,
-  };
+  let fxRates: Record<string, number> = loadCachedFxRates();
   try {
     const liveRates = await fetchLiveFxRates();
     if (liveRates && Object.keys(liveRates).length > 0) {
@@ -181,13 +208,13 @@ export async function fetchLiveMarketPrices(
       return;
     }
 
-    // Case 2: Cash in foreign currency (e.g. USD, USDT, USDC, EUR, JPY)
+    // Case 2: Cash in foreign currency (e.g. USD, USDT, USDC, IDR, EUR, JPY)
     if (a.isCash) {
       const rate =
         fxRates[curr] ||
         (curr === 'USD' || curr === 'USDT' || curr === 'USDC'
           ? fxRates['USD'] || 32.5
-          : a.currentPrice && a.currentPrice > 1
+          : a.currentPrice && a.currentPrice > 0 && a.currentPrice !== 1
           ? a.currentPrice
           : 1);
       updatedPrices[a.id] = rate;

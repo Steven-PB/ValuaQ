@@ -1,5 +1,6 @@
 import { MonthlyRecord, Category, Asset, AppSettings, LedgerTransaction, MonthlyPriceMap, MonthlyNotesMap } from '../types';
 import { recalculateMonthlyRecords, DeletedIdsMap } from './storage';
+import { normalizeCurrencyCode, getCurrencySymbolForCode } from './formatters';
 
 /**
  * Merges Cloud data (Sync Data) and Local Device data (Data on Device)
@@ -261,7 +262,11 @@ export function mergeAssets(
     } else if (c && d) {
       const cTime = c.updatedAt ? new Date(c.updatedAt).getTime() : 0;
       const dTime = d.updatedAt ? new Date(d.updatedAt).getTime() : 0;
-      result.push(dTime >= cTime ? d : c);
+      const winner = { ...(dTime >= cTime ? d : c) };
+      if (!winner.priceCurrency && (d.priceCurrency || c.priceCurrency)) {
+        winner.priceCurrency = d.priceCurrency || c.priceCurrency;
+      }
+      result.push(winner);
     }
   }
 
@@ -272,8 +277,16 @@ export function mergeSettings(
   cloudSettings?: AppSettings,
   deviceSettings?: AppSettings
 ): AppSettings {
+  const chosenBase =
+    deviceSettings?.baseCurrency ||
+    cloudSettings?.baseCurrency ||
+    deviceSettings?.currencySymbol ||
+    cloudSettings?.currencySymbol ||
+    'NTD';
+  const baseCode = normalizeCurrencyCode(chosenBase);
   return {
-    currencySymbol: 'NT$',
+    baseCurrency: baseCode,
+    currencySymbol: getCurrencySymbolForCode(baseCode),
     stealthMode: deviceSettings?.stealthMode ?? cloudSettings?.stealthMode ?? false,
     defaultChartType: deviceSettings?.defaultChartType || cloudSettings?.defaultChartType || 'all',
     defaultGroupMode: deviceSettings?.defaultGroupMode || cloudSettings?.defaultGroupMode || 'category',
@@ -400,12 +413,15 @@ function canonicalizeCategory(c: Category): string {
 }
 
 function canonicalizeAsset(a: Asset): string {
+  const rawPriceCurr = String(a.priceCurrency || 'NTD').trim().toUpperCase();
+  const normPriceCurr = rawPriceCurr === 'TWD' ? 'NTD' : rawPriceCurr;
   return JSON.stringify({
     id: String(a.id || '').trim(),
     name: String(a.name || '').trim(),
     categoryId: String(a.categoryId || '').trim(),
     tickerSymbol: String(a.tickerSymbol || '').trim().toUpperCase(),
     currency: String(a.currency || 'NTD').trim().toUpperCase(),
+    priceCurrency: normPriceCurr,
     isCash: Boolean(a.isCash),
   });
 }

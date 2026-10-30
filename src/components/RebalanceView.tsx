@@ -19,7 +19,17 @@ import {
 } from 'lucide-react';
 import { Category, Asset, MonthlyRecord, RebalanceMode } from '../types';
 import { calculateRebalance, getTargetPresets, isEmergencyFundCategory } from '../lib/rebalanceEngine';
-import { formatCurrency, formatPercent, formatNumberWithCommas, parseFormattedNumber, isLiveMonth, formatMonthName } from '../lib/formatters';
+import {
+  formatCurrency,
+  formatPercent,
+  formatNumberWithCommas,
+  parseFormattedNumber,
+  isLiveMonth,
+  formatMonthName,
+  resolveCurrencyCodeFromSymbolOrCode,
+  convertPriceFromNTD,
+  convertPriceToNTD,
+} from '../lib/formatters';
 
 interface RebalanceViewProps {
   categories: Category[];
@@ -66,13 +76,29 @@ export const RebalanceView: React.FC<RebalanceViewProps> = ({
     return initial;
   });
 
-  // Rebalance mode & deposit capital input (formatted with live thousand separators)
+  const activeBaseCode = resolveCurrencyCodeFromSymbolOrCode(currencySymbol);
+  const prevBaseCodeRef = React.useRef<string>(activeBaseCode);
+
+  // Rebalance mode & deposit capital input (formatted with live thousand separators in active Base Currency)
   const [mode, setMode] = useState<RebalanceMode>('cashflow');
   const [depositInput, setDepositInput] = useState<string>(() => {
-    return latestRecord?.monthlyMoneyInvested
-      ? formatNumberWithCommas(latestRecord.monthlyMoneyInvested)
-      : '10,000';
+    const initialNtd = latestRecord?.monthlyMoneyInvested || 10000;
+    const converted = Math.round(convertPriceFromNTD(initialNtd, activeBaseCode));
+    return formatNumberWithCommas(converted);
   });
+
+  // Automatically convert depositInput when the user switches the global Base Currency
+  useEffect(() => {
+    if (prevBaseCodeRef.current !== activeBaseCode) {
+      const currentVal = parseFormattedNumber(depositInput);
+      if (currentVal > 0) {
+        const inNtd = convertPriceToNTD(currentVal, prevBaseCodeRef.current);
+        const inNewBase = Math.round(convertPriceFromNTD(inNtd, activeBaseCode));
+        setDepositInput(formatNumberWithCommas(inNewBase));
+      }
+      prevBaseCodeRef.current = activeBaseCode;
+    }
+  }, [activeBaseCode, depositInput]);
 
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
 
@@ -127,8 +153,11 @@ export const RebalanceView: React.FC<RebalanceViewProps> = ({
     }));
   }, [categories, localTargets]);
 
-  // Parse masked deposit input for calculation engine (only applicable in cashflow mode)
-  const parsedDeposit = mode === 'cashflow' ? parseFormattedNumber(depositInput) : 0;
+  // Parse masked deposit input in active Base Currency and convert to canonical NTD for calculation engine
+  const parsedDeposit =
+    mode === 'cashflow'
+      ? convertPriceToNTD(parseFormattedNumber(depositInput), activeBaseCode)
+      : 0;
 
   // Run calculation engine with 5% tolerance margin
   const analysis = useMemo(() => {
@@ -465,30 +494,36 @@ export const RebalanceView: React.FC<RebalanceViewProps> = ({
             <div className="md:col-span-7 flex flex-wrap items-center gap-1.5 pt-1">
               {latestRecord && latestRecord.monthlyMoneyInvested > 0 && (
                 <button
-                  onClick={() => setDepositInput(formatNumberWithCommas(latestRecord.monthlyMoneyInvested))}
+                  onClick={() =>
+                    setDepositInput(
+                      formatNumberWithCommas(
+                        Math.round(convertPriceFromNTD(latestRecord.monthlyMoneyInvested, activeBaseCode))
+                      )
+                    )
+                  }
                   className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-400 text-xs font-medium transition-colors cursor-pointer"
                 >
-                  Use Latest Month's Invested ({formatCurrency(latestRecord.monthlyMoneyInvested, currencySymbol, stealthMode)})
+                  Use Latest Month&apos;s Invested ({formatCurrency(latestRecord.monthlyMoneyInvested, currencySymbol, stealthMode)})
                 </button>
               )}
-              <button
-                onClick={() => setDepositInput(formatNumberWithCommas(parseFormattedNumber(depositInput) + 5000))}
-                className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-medium transition-colors cursor-pointer"
-              >
-                +5,000
-              </button>
-              <button
-                onClick={() => setDepositInput(formatNumberWithCommas(parseFormattedNumber(depositInput) + 10000))}
-                className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-medium transition-colors cursor-pointer"
-              >
-                +10,000
-              </button>
-              <button
-                onClick={() => setDepositInput(formatNumberWithCommas(parseFormattedNumber(depositInput) + 50000))}
-                className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-medium transition-colors cursor-pointer"
-              >
-                +50,000
-              </button>
+              {(activeBaseCode === 'IDR'
+                ? [1_000_000, 5_000_000, 25_000_000]
+                : activeBaseCode === 'JPY'
+                ? [10_000, 50_000, 100_000]
+                : activeBaseCode === 'NTD' || activeBaseCode === 'HKD' || activeBaseCode === 'CNY'
+                ? [5_000, 10_000, 50_000]
+                : [100, 500, 2_000]
+              ).map((stepAmount) => (
+                <button
+                  key={stepAmount}
+                  onClick={() =>
+                    setDepositInput(formatNumberWithCommas(parseFormattedNumber(depositInput) + stepAmount))
+                  }
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-medium transition-colors cursor-pointer"
+                >
+                  +{formatNumberWithCommas(stepAmount)}
+                </button>
+              ))}
               <button
                 onClick={() => setDepositInput('0')}
                 className="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-slate-200 text-xs transition-colors cursor-pointer"

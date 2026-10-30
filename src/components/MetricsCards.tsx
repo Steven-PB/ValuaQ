@@ -11,7 +11,7 @@ import {
   X,
   Sparkles,
 } from 'lucide-react';
-import { formatCurrency, formatPercent, formatNumberWithCommas, isLiveMonth, formatMonthName } from '../lib/formatters';
+import { formatCurrency, formatPercent, formatNumberWithCommas, isLiveMonth, formatMonthName, formatAssetUnitPrice } from '../lib/formatters';
 import { RiskLevel } from '../types';
 import { MiniSparkline, SparklinePoint } from './MiniSparkline';
 import { MonthlySavingsBar, MonthlySavingsPoint } from './MonthlySavingsBar';
@@ -21,6 +21,7 @@ export interface AssetPLContribution {
   name: string;
   tickerSymbol?: string;
   currency?: string;
+  priceCurrency?: string;
   isCash?: boolean;
   categoryId: string;
   categoryName: string;
@@ -678,7 +679,7 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({
                             </div>
                             <div className="text-[10px] text-slate-400 mt-0.5">
                               {stealthMode ? '••••' : formatNumberWithCommas(ast.quantity)} units @{' '}
-                              {formatCurrency(ast.unitPrice, currencySymbol, stealthMode)}
+                              {formatAssetUnitPrice(ast.unitPrice, ast, stealthMode)}
                             </div>
                           </td>
 

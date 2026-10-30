@@ -22,6 +22,7 @@ export interface Asset {
   guardBand?: number; // Optional minimum reserve floor (>= 0 guard band) for Convert deductions
   currentPrice?: number; // Latest known spot price in base currency (default 1 for cash)
   currency?: string; // e.g. "USD", "NTD"
+  priceCurrency?: string; // Display currency for this asset's unit price (e.g. "NTD", "USD", "JPY", "EUR")
   description?: string;
   updatedAt?: string;
 }
@@ -82,7 +83,8 @@ export interface FilterState {
 }
 
 export interface AppSettings {
-  currencySymbol: string; // e.g. "NT$" or "$"
+  baseCurrency?: string; // e.g. "NTD", "IDR", "USD", "JPY", "EUR"
+  currencySymbol: string; // e.g. "NT$", "Rp", "US$"
   stealthMode: boolean; // Mask values for privacy
   defaultChartType: ChartType;
   defaultGroupMode: ChartGroupMode;

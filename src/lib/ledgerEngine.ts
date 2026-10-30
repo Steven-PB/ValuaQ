@@ -201,10 +201,17 @@ export function getTransactionInvestmentCapitalDelta(
     if (!ast) return 1;
     const curr = (ast.currency || 'NTD').toUpperCase();
     if (curr === 'NTD' || curr === 'TWD') return 1;
-    if (ast.currentPrice && ast.currentPrice > 1) return ast.currentPrice;
+    if (ast.currentPrice && ast.currentPrice > 0 && ast.currentPrice !== 1) return ast.currentPrice;
     if (curr === 'USD' || curr === 'USDT' || curr === 'USDC') return defaultUsdRate;
+    if (curr === 'IDR') return 0.002;
     if (curr === 'EUR') return 35.0;
     if (curr === 'JPY') return 0.22;
+    if (curr === 'GBP') return 42.0;
+    if (curr === 'HKD') return 4.15;
+    if (curr === 'SGD') return 24.5;
+    if (curr === 'AUD') return 21.5;
+    if (curr === 'CAD') return 23.5;
+    if (curr === 'CNY') return 4.5;
     return ast.currentPrice || 1;
   };
 
@@ -427,12 +434,15 @@ export function getAssetBasePrice(
   if (curr === 'USD' || curr === 'USDT' || curr === 'USDC') {
     return defaultUsdRate;
   }
+  if (curr === 'IDR') return 0.002;
   if (curr === 'EUR') return 35.0;
   if (curr === 'JPY') return 0.22;
   if (curr === 'GBP') return 42.0;
   if (curr === 'AUD') return 21.5;
   if (curr === 'CAD') return 23.5;
   if (curr === 'SGD') return 24.5;
+  if (curr === 'HKD') return 4.15;
+  if (curr === 'CNY') return 4.5;
 
   return 1;
 }
@@ -480,11 +490,13 @@ export function generateMonthlyRecordsFromLedger(
       sym === 'USDT' ||
       sym === 'USDC' ||
       sym === 'USD' ||
+      sym === 'IDR' ||
       sym === 'BUSD' ||
       sym === 'DAI' ||
       name.includes('usdt') ||
       name.includes('usdc') ||
       name.includes('cash usd') ||
+      name.includes('cash idr') ||
       (Boolean(ast.isCash) && curr !== 'NTD' && curr !== 'TWD')
     );
   };
@@ -493,10 +505,17 @@ export function generateMonthlyRecordsFromLedger(
     if (!ast) return 1;
     const curr = (ast.currency || 'NTD').toUpperCase();
     if (curr === 'NTD' || curr === 'TWD') return 1;
-    if (ast.currentPrice && ast.currentPrice > 1) return ast.currentPrice;
+    if (ast.currentPrice && ast.currentPrice > 0 && ast.currentPrice !== 1) return ast.currentPrice;
     if (curr === 'USD' || curr === 'USDT' || curr === 'USDC') return defaultUsdRate;
+    if (curr === 'IDR') return 0.002;
     if (curr === 'EUR') return 35.0;
     if (curr === 'JPY') return 0.22;
+    if (curr === 'GBP') return 42.0;
+    if (curr === 'HKD') return 4.15;
+    if (curr === 'SGD') return 24.5;
+    if (curr === 'AUD') return 21.5;
+    if (curr === 'CAD') return 23.5;
+    if (curr === 'CNY') return 4.5;
     return ast.currentPrice || 1;
   };
 

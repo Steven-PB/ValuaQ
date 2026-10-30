@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { Asset, Category, LedgerTransaction, TransactionType } from '../types';
 import { CustomDropdown, DropdownOption } from './CustomDropdown';
-import { formatNumberWithCommas, parseFormattedNumber, formatCurrency, isLiveMonth } from '../lib/formatters';
+import { formatNumberWithCommas, parseFormattedNumber, formatCurrency, isLiveMonth, SUPPORTED_PRICE_CURRENCIES, getAssetPriceCurrency, formatAssetUnitPrice } from '../lib/formatters';
 import { 
   isEmergencyFundAsset, 
   getTransactionInvestmentCapitalDelta, 
@@ -2410,10 +2410,29 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
 
                           {/* Spot Price */}
                           <td className="p-3 text-right font-mono text-slate-300 text-xs">
-                            {isCash && (ast.currency === 'NTD' || ast.currency === 'TWD') ? (
+                            {isCash && (ast.currency === 'NTD' || ast.currency === 'TWD') && getAssetPriceCurrency(ast) === 'NTD' ? (
                               <span className="text-slate-500">1.00 (Base)</span>
                             ) : (
-                              formatCurrency(price, currencySymbol, stealthMode)
+                              <div className="flex flex-col items-end gap-0.5">
+                                <span className="text-emerald-400 font-semibold">
+                                  {formatAssetUnitPrice(price, ast, stealthMode)}
+                                </span>
+                                {onEditAsset && (
+                                  <select
+                                    value={getAssetPriceCurrency(ast)}
+                                    onChange={(e) => onEditAsset(ast.id, { priceCurrency: e.target.value })}
+                                    onClick={(e) => e.stopPropagation()}
+                                    title="Change display currency for this asset's spot price"
+                                    className="bg-slate-900 border border-slate-700/80 hover:border-indigo-500/60 text-indigo-300 font-mono font-bold text-[9px] rounded px-1 py-0.2 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                                  >
+                                    {SUPPORTED_PRICE_CURRENCIES.map((c) => (
+                                      <option key={c.code} value={c.code}>
+                                        {c.code}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
+                              </div>
                             )}
                           </td>
 
