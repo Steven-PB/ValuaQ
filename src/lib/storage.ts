@@ -7,10 +7,61 @@ const STORAGE_KEYS = {
   RECORDS: 'valuaq_records_v4_zero',
   SETTINGS: 'valuaq_settings_v4_zero',
   DELETED_MONTHS: 'valuaq_deleted_months_v4_zero',
+  DELETED_IDS: 'valuaq_deleted_ids_v4_zero',
   TRANSACTIONS: 'valuaq_transactions_v4_zero',
   MONTHLY_PRICES: 'valuaq_monthly_prices_v4_zero',
   MONTHLY_NOTES: 'valuaq_monthly_notes_v4_zero',
 };
+
+export interface DeletedIdsMap {
+  categories: string[];
+  assets: string[];
+  transactions: string[];
+}
+
+export function loadDeletedIds(): DeletedIdsMap {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.DELETED_IDS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        categories: Array.isArray(parsed?.categories) ? parsed.categories : [],
+        assets: Array.isArray(parsed?.assets) ? parsed.assets : [],
+        transactions: Array.isArray(parsed?.transactions) ? parsed.transactions : [],
+      };
+    }
+  } catch (e) {
+    console.error('Failed to load deleted IDs from storage', e);
+  }
+  return { categories: [], assets: [], transactions: [] };
+}
+
+export function saveDeletedIds(deletedIds: DeletedIdsMap): void {
+  try {
+    const normalized: DeletedIdsMap = {
+      categories: Array.from(new Set(deletedIds?.categories || [])),
+      assets: Array.from(new Set(deletedIds?.assets || [])),
+      transactions: Array.from(new Set(deletedIds?.transactions || [])),
+    };
+    localStorage.setItem(STORAGE_KEYS.DELETED_IDS, JSON.stringify(normalized));
+  } catch (e) {
+    console.error('Failed to save deleted IDs to storage', e);
+  }
+}
+
+export function addDeletedId(
+  type: 'categories' | 'assets' | 'transactions',
+  ids: string | string[]
+): DeletedIdsMap {
+  const current = loadDeletedIds();
+  const idList = Array.isArray(ids) ? ids : [ids];
+  const next: DeletedIdsMap = {
+    ...current,
+    [type]: Array.from(new Set([...(current[type] || []), ...idList.filter(Boolean)])),
+  };
+  saveDeletedIds(next);
+  return next;
+}
 
 export function loadDeletedMonths(): string[] {
   try {
@@ -49,7 +100,7 @@ export function loadCategories(): Category[] {
   } catch (e) {
     console.error('Failed to load categories from storage', e);
   }
-  return initialCategories;
+  return [];
 }
 
 export function saveCategories(categories: Category[]): void {
@@ -67,7 +118,7 @@ export function loadAssets(): Asset[] {
   } catch (e) {
     console.error('Failed to load assets from storage', e);
   }
-  return initialAssets;
+  return [];
 }
 
 export function saveAssets(assets: Asset[]): void {
@@ -322,6 +373,7 @@ export function importAllData(jsonString: string): boolean {
     saveMonthlyNotes(data.monthlyNotes || {});
     saveMonthlyRecords(data.records || []);
     saveDeletedMonths(data.deletedRecordMonths || []);
+    saveDeletedIds({ categories: [], assets: [], transactions: [] });
     saveSettings(data.settings);
     return true;
   } catch (e) {
@@ -422,6 +474,7 @@ export function resetAllDataToZero(): void {
     localStorage.removeItem(STORAGE_KEYS.RECORDS);
     localStorage.removeItem(STORAGE_KEYS.SETTINGS);
     localStorage.removeItem(STORAGE_KEYS.DELETED_MONTHS);
+    localStorage.removeItem(STORAGE_KEYS.DELETED_IDS);
     localStorage.removeItem(STORAGE_KEYS.TRANSACTIONS);
     localStorage.removeItem(STORAGE_KEYS.MONTHLY_PRICES);
     localStorage.removeItem(STORAGE_KEYS.MONTHLY_NOTES);
@@ -435,6 +488,7 @@ export function resetAllDataToZero(): void {
   saveMonthlyPrices({});
   saveMonthlyNotes({});
   saveDeletedMonths([]);
+  saveDeletedIds({ categories: [], assets: [], transactions: [] });
   saveSettings(initialSettings);
 }
 

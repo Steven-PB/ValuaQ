@@ -2,7 +2,7 @@
   "entities": {
     "users": {
       "title": "User Profile & Portfolio Data",
-      "description": "Contains user portfolio categories, assets, monthly records and settings",
+      "description": "Contains user portfolio categories, assets, monthly records, transactions, price snapshots, notes, tombstones, and settings",
       "type": "object",
       "properties": {
         "email": { "type": "string" },
@@ -14,8 +14,17 @@
         "monthlyRecords": { "type": "array" },
         "transactions": { "type": "array" },
         "monthlyAssetPrices": { "type": "object" },
+        "monthlyNotes": { "type": "object" },
+        "deletedRecordMonths": { "type": "array" },
+        "deletedIds": { "type": "object" },
         "settings": { "type": "object" }
       }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "users",
+      "description": "Per-user portfolio state synchronized across devices"
     }
   }
 }

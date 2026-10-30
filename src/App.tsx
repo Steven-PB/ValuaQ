@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { Trash2, AlertCircle, CheckCircle2, RefreshCw, X, AlertTriangle, GitMerge, Activity } from 'lucide-react';
 import { 
   loadCategories, saveCategories, 
   loadAssets, saveAssets, 
@@ -9,7 +9,8 @@ import {
   loadMonthlyNotes, saveMonthlyNotes, setMonthNote,
   loadSettings, saveSettings, 
   resetToDemoData, resetAllDataToZero,
-  loadDeletedMonths, saveDeletedMonths, addDeletedMonth, removeDeletedMonth 
+  loadDeletedMonths, saveDeletedMonths, addDeletedMonth, removeDeletedMonth,
+  loadDeletedIds, saveDeletedIds, addDeletedId, DeletedIdsMap
 } from './lib/storage';
 import { 
   mergeMonthlyRecords, 
@@ -17,7 +18,11 @@ import {
   mergeAssets, 
   mergeSettings,
   mergeTransactions,
-  mergeMonthlyPrices
+  mergeMonthlyPrices,
+  mergeMonthlyNotes,
+  mergeDeletedIds,
+  computeLedgerChecksum,
+  computeSyncHealthReport
 } from './lib/syncMerge';
 import { 
   generateMonthlyRecordsFromLedger,
@@ -40,7 +45,8 @@ import {
   syncDataToCloud, 
   fetchUserCloudData, 
   subscribeToUserData,
-  User 
+  User,
+  UserCloudData
 } from './lib/firebase';
 
 import { Header } from './components/Header';
@@ -54,12 +60,21 @@ import { HierarchyManager } from './components/HierarchyManager';
 import { DataManagementModal } from './components/DataManagementModal';
 import { LoginScreen } from './components/LoginScreen';
 import { RebalanceView } from './components/RebalanceView';
+import { SyncHealthModal } from './components/SyncHealthModal';
 
 export default function App() {
   // User Auth & Cloud Sync States
   const [user, setUser] = useState<User | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isCloudLoaded, setIsCloudLoaded] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [syncSuccessMsg, setSyncSuccessMsg] = useState<string | null>(null);
+  const [latestCloudSnapshot, setLatestCloudSnapshot] = useState<UserCloudData | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [isSyncHealthOpen, setIsSyncHealthOpen] = useState(false);
+  const isUploadingRef = useRef(false);
+  const inFlightUploadsRef = useRef(0);
+  const uploadQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   // Core Application Data States
   const [categories, setCategories] = useState<Category[]>(loadCategories);
@@ -75,6 +90,12 @@ export default function App() {
     const localTx = loadTransactions();
     return localTx.length === 0 ? 'ledger' : 'dashboard';
   });
+  const hasUserSwitchedTabRef = useRef(false);
+  const handleSelectTab = useCallback((tab: 'dashboard' | 'ledger' | 'spreadsheet' | 'hierarchy' | 'rebalance') => {
+    hasUserSwitchedTabRef.current = true;
+    setActiveTab(tab);
+  }, []);
+
   const [chartType, setChartType] = useState<ChartType>('all');
 
   // Filter State
@@ -85,23 +106,57 @@ export default function App() {
     searchQuery: '',
   }));
 
-  // One-time zero reset to fulfill user's request: "Anyway, just reset all the data including the categories, we are making this back from 0"
+  // Track known category and asset IDs so any newly synced or created items are automatically checked in filters
+  const knownCategoryIdsRef = useRef<Set<string>>(new Set(loadCategories().map((c) => c.id)));
+  const knownAssetIdsRef = useRef<Set<string>>(new Set(loadAssets().map((a) => a.id)));
+
+  useEffect(() => {
+    setFilters((prev) => {
+      const allCatIds = categories.map((c) => c.id);
+      const allAssetIds = assets.map((a) => a.id);
+
+      const newCatIds = allCatIds.filter((id) => !knownCategoryIdsRef.current.has(id));
+      const newAssetIds = allAssetIds.filter((id) => !knownAssetIdsRef.current.has(id));
+
+      allCatIds.forEach((id) => knownCategoryIdsRef.current.add(id));
+      allAssetIds.forEach((id) => knownAssetIdsRef.current.add(id));
+
+      const validSelectedCats = prev.categoryIds.filter((id) => allCatIds.includes(id));
+      const validSelectedAssets = prev.assetIds.filter((id) => allAssetIds.includes(id));
+
+      // If filters were empty when categories/assets arrived from Cloud Sync, select all
+      const nextCatIds =
+        validSelectedCats.length === 0 && allCatIds.length > 0
+          ? allCatIds
+          : Array.from(new Set([...validSelectedCats, ...newCatIds]));
+
+      const nextAssetIds =
+        validSelectedAssets.length === 0 && allAssetIds.length > 0
+          ? allAssetIds
+          : Array.from(new Set([...validSelectedAssets, ...newAssetIds]));
+
+      if (
+        nextCatIds.length === prev.categoryIds.length &&
+        nextAssetIds.length === prev.assetIds.length &&
+        nextCatIds.every((id, idx) => id === prev.categoryIds[idx]) &&
+        nextAssetIds.every((id, idx) => id === prev.assetIds[idx])
+      ) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        categoryIds: nextCatIds,
+        assetIds: nextAssetIds,
+      };
+    });
+  }, [categories, assets]);
+
+  // Ensure v4 zero flag is set without wiping active cloud sessions
   useEffect(() => {
     const flag = localStorage.getItem('valuaq_zero_init_v4');
     if (!flag) {
-      resetAllDataToZero();
       localStorage.setItem('valuaq_zero_init_v4', 'true');
-      setCategories([]);
-      setAssets([]);
-      setTransactions([]);
-      setMonthlyPrices({});
-      setMonthlyNotes({});
-      setFilters({
-        categoryIds: [],
-        assetIds: [],
-        riskLevels: ['Low', 'Medium', 'High'],
-        searchQuery: '',
-      });
     }
   }, []);
 
@@ -148,148 +203,370 @@ export default function App() {
       setUser(currentUser);
       if (!currentUser) {
         setIsCloudLoaded(false);
+        setLatestCloudSnapshot(null);
+        setLastSyncedAt(null);
       }
     });
     return () => unsubscribe();
   }, []);
 
-  // Fetch Cloud Data upon connection with Set Union Guard
+  // Helper to atomically apply a merged state across Categories, Assets, and Transactions
+  const applyAtomicLocalMerge = useCallback((cloudData: UserCloudData) => {
+    const localDeletedMonths = loadDeletedMonths();
+    const finalDeletedMonths = Array.from(
+      new Set([...(cloudData.deletedRecordMonths || []), ...localDeletedMonths])
+    );
+    const finalDeletedIds = mergeDeletedIds(cloudData.deletedIds, loadDeletedIds());
+    saveDeletedMonths(finalDeletedMonths);
+    saveDeletedIds(finalDeletedIds);
+
+    const currentLocalCats = loadCategories();
+    const currentLocalAssets = loadAssets();
+    const currentLocalTx = loadTransactions();
+    const currentLocalPrices = loadMonthlyPrices();
+    const currentLocalNotes = loadMonthlyNotes();
+    const currentLocalSettings = loadSettings();
+
+    // 1. Merge Transactions first
+    const finalTx = mergeTransactions(
+      cloudData.transactions,
+      currentLocalTx,
+      finalDeletedIds.transactions
+    );
+
+    // 2. Merge Assets with referential integrity guard for active transactions
+    const finalAssets = mergeAssets(
+      cloudData.assets,
+      currentLocalAssets,
+      finalDeletedIds.assets,
+      finalTx
+    );
+
+    // 3. Merge Categories with referential integrity guard for active assets
+    const finalCats = mergeCategories(
+      cloudData.categories,
+      currentLocalCats,
+      finalDeletedIds.categories,
+      finalAssets
+    );
+
+    const finalPrices = mergeMonthlyPrices(cloudData.monthlyPrices, currentLocalPrices);
+    const finalNotes = mergeMonthlyNotes(cloudData.monthlyNotes, currentLocalNotes);
+    const finalSettings = mergeSettings(cloudData.settings, currentLocalSettings);
+
+    // Persist atomically to localStorage before updating React state
+    saveCategories(finalCats);
+    saveAssets(finalAssets);
+    saveTransactions(finalTx);
+    saveMonthlyPrices(finalPrices);
+    saveMonthlyNotes(finalNotes);
+    saveSettings(finalSettings);
+
+    // Apply all state updates in a single synchronous batch
+    setCategories(finalCats);
+    setAssets(finalAssets);
+    setTransactions(finalTx);
+    setMonthlyPrices(finalPrices);
+    setMonthlyNotes(finalNotes);
+    setSettings(finalSettings);
+
+    if (finalTx.length > 0 && !hasUserSwitchedTabRef.current) {
+      setActiveTab('dashboard');
+    }
+
+    return {
+      finalCats,
+      finalAssets,
+      finalTx,
+      finalPrices,
+      finalNotes,
+      finalSettings,
+      finalDeletedMonths,
+      finalDeletedIds,
+    };
+  }, []);
+
+  // Fetch Cloud Data upon connection with Set Union Guard & Tombstone Protection
   useEffect(() => {
     if (!user) {
       setIsCloudLoaded(false);
+      setLatestCloudSnapshot(null);
       return;
     }
 
+    setIsCloudLoaded(false);
     setIsSyncing(true);
+    setSyncError(null);
 
-    fetchUserCloudData(user.uid)
+    fetchUserCloudData(user.uid, { fromServer: true })
       .then(async (cloudData) => {
         const localDeletedMonths = loadDeletedMonths();
+        const localDeletedIds = loadDeletedIds();
 
         if (cloudData) {
-          const finalDeletedMonths = Array.from(
-            new Set([...(cloudData.deletedRecordMonths || []), ...localDeletedMonths])
-          );
-          saveDeletedMonths(finalDeletedMonths);
+          const {
+            finalCats,
+            finalAssets,
+            finalTx,
+            finalPrices,
+            finalNotes,
+            finalSettings,
+            finalDeletedMonths,
+            finalDeletedIds,
+          } = applyAtomicLocalMerge(cloudData);
 
+          // Seed spot prices from synced assets
+          const syncedSpotPrices: Record<string, number> = {};
+          finalAssets.forEach((a) => {
+            if (a.currentPrice && a.currentPrice > 0) {
+              syncedSpotPrices[a.id] = a.currentPrice;
+            }
+          });
+          if (Object.keys(syncedSpotPrices).length > 0) {
+            setLivePrices((prev) => ({ ...syncedSpotPrices, ...prev }));
+          }
+
+          const freshRecords = generateMonthlyRecordsFromLedger(
+            finalTx,
+            finalAssets,
+            finalPrices,
+            { ...syncedSpotPrices, ...livePrices },
+            finalNotes
+          );
+
+          isUploadingRef.current = true;
+          try {
+            const syncResult = await syncDataToCloud(user.uid, {
+              categories: finalCats,
+              assets: finalAssets,
+              records: freshRecords,
+              transactions: finalTx,
+              monthlyPrices: finalPrices,
+              monthlyNotes: finalNotes,
+              settings: finalSettings,
+              deletedRecordMonths: finalDeletedMonths,
+              deletedIds: finalDeletedIds,
+            });
+            if (syncResult) {
+              saveCategories(syncResult.categories);
+              saveAssets(syncResult.assets);
+              saveTransactions(syncResult.transactions);
+              saveMonthlyPrices(syncResult.monthlyPrices);
+              saveMonthlyNotes(syncResult.monthlyNotes);
+              saveSettings(syncResult.settings);
+              saveDeletedMonths(syncResult.deletedRecordMonths);
+              saveDeletedIds(syncResult.deletedIds);
+
+              setCategories(syncResult.categories);
+              setAssets(syncResult.assets);
+              setTransactions(syncResult.transactions);
+              setMonthlyPrices(syncResult.monthlyPrices);
+              setMonthlyNotes(syncResult.monthlyNotes);
+              setSettings(syncResult.settings);
+
+              setLatestCloudSnapshot({
+                categories: syncResult.categories,
+                assets: syncResult.assets,
+                records: syncResult.records,
+                transactions: syncResult.transactions,
+                monthlyPrices: syncResult.monthlyPrices,
+                monthlyNotes: syncResult.monthlyNotes,
+                settings: syncResult.settings,
+                deletedRecordMonths: syncResult.deletedRecordMonths,
+                deletedIds: syncResult.deletedIds,
+              });
+              setLastSyncedAt(new Date().toLocaleTimeString());
+            } else {
+              setLatestCloudSnapshot({
+                categories: finalCats,
+                assets: finalAssets,
+                records: freshRecords,
+                transactions: finalTx,
+                monthlyPrices: finalPrices,
+                monthlyNotes: finalNotes,
+                settings: finalSettings,
+                deletedRecordMonths: finalDeletedMonths,
+                deletedIds: finalDeletedIds,
+              });
+              setLastSyncedAt(new Date().toLocaleTimeString());
+            }
+          } finally {
+            isUploadingRef.current = inFlightUploadsRef.current > 0;
+          }
+        } else {
+          // Initialize empty cloud database with current local data
           const currentLocalCats = loadCategories();
           const currentLocalAssets = loadAssets();
           const currentLocalTx = loadTransactions();
           const currentLocalPrices = loadMonthlyPrices();
+          const currentLocalNotes = loadMonthlyNotes();
           const currentLocalSettings = loadSettings();
+          const freshRecords = generateMonthlyRecordsFromLedger(
+            currentLocalTx,
+            currentLocalAssets,
+            currentLocalPrices,
+            livePrices,
+            currentLocalNotes
+          );
 
-          const finalCats = mergeCategories(cloudData.categories, currentLocalCats);
-          const finalAssets = mergeAssets(cloudData.assets, currentLocalAssets);
-          const finalTx = mergeTransactions(cloudData.transactions, currentLocalTx);
-          const finalPrices = mergeMonthlyPrices(cloudData.monthlyPrices, currentLocalPrices);
-          const finalSettings = mergeSettings(cloudData.settings, currentLocalSettings);
-
-          setCategories(finalCats);
-          setAssets(finalAssets);
-          setTransactions(finalTx);
-          setMonthlyPrices(finalPrices);
-          setSettings(finalSettings);
-
-          saveCategories(finalCats);
-          saveAssets(finalAssets);
-          saveTransactions(finalTx);
-          saveMonthlyPrices(finalPrices);
-          saveSettings(finalSettings);
-
-          await syncDataToCloud(user.uid, {
-            categories: finalCats,
-            assets: finalAssets,
-            records,
-            transactions: finalTx,
-            monthlyPrices: finalPrices,
-            settings: finalSettings,
-            deletedRecordMonths: finalDeletedMonths,
-          });
-        } else if (!isCloudLoaded) {
-          // Initialize empty cloud database with current local data
-          await syncDataToCloud(user.uid, {
-            categories,
-            assets,
-            records,
-            transactions,
-            monthlyPrices,
-            settings,
-            deletedRecordMonths: localDeletedMonths,
-          });
+          isUploadingRef.current = true;
+          try {
+            const syncResult = await syncDataToCloud(user.uid, {
+              categories: currentLocalCats,
+              assets: currentLocalAssets,
+              records: freshRecords,
+              transactions: currentLocalTx,
+              monthlyPrices: currentLocalPrices,
+              monthlyNotes: currentLocalNotes,
+              settings: currentLocalSettings,
+              deletedRecordMonths: localDeletedMonths,
+              deletedIds: localDeletedIds,
+            });
+            if (syncResult) {
+              setLatestCloudSnapshot({
+                categories: syncResult.categories,
+                assets: syncResult.assets,
+                records: syncResult.records,
+                transactions: syncResult.transactions,
+                monthlyPrices: syncResult.monthlyPrices,
+                monthlyNotes: syncResult.monthlyNotes,
+                settings: syncResult.settings,
+                deletedRecordMonths: syncResult.deletedRecordMonths,
+                deletedIds: syncResult.deletedIds,
+              });
+              setLastSyncedAt(new Date().toLocaleTimeString());
+            }
+          } finally {
+            isUploadingRef.current = inFlightUploadsRef.current > 0;
+          }
         }
         setIsCloudLoaded(true);
       })
-      .catch((err) => {
-        console.error("Cloud fetch error:", err);
+      .catch((err: any) => {
+        console.error('Cloud fetch error:', err);
+        setSyncError('Failed to fetch cloud portfolio data. Click Sync to retry.');
       })
       .finally(() => {
         setIsSyncing(false);
       });
 
-    // Real-time Firestore Subscription
+    // Real-time Firestore Subscription (Atomic Ledger + Asset + Category application)
     const unsubscribeSnapshot = subscribeToUserData(
       user.uid,
       (cloudData) => {
-        if (!cloudData) return;
-        const localDeletedMonths = loadDeletedMonths();
-        const finalDeletedMonths = Array.from(
-          new Set([...(cloudData.deletedRecordMonths || []), ...localDeletedMonths])
-        );
+        if (!cloudData || isUploadingRef.current) return;
 
-        setCategories((prevDeviceCats) => {
-          const finalCats = mergeCategories(cloudData.categories, prevDeviceCats);
-          saveCategories(finalCats);
-          return finalCats;
+        const merged = applyAtomicLocalMerge(cloudData);
+        const mergedChecksum = computeLedgerChecksum({
+          categories: merged.finalCats,
+          assets: merged.finalAssets,
+          transactions: merged.finalTx,
+        });
+        const incomingChecksum = computeLedgerChecksum({
+          categories: cloudData.categories || [],
+          assets: cloudData.assets || [],
+          transactions: cloudData.transactions || [],
         });
 
-        setAssets((prevDeviceAssets) => {
-          const finalAssets = mergeAssets(cloudData.assets, prevDeviceAssets);
-          saveAssets(finalAssets);
-          return finalAssets;
+        setLatestCloudSnapshot({
+          ...cloudData,
+          categories: merged.finalCats,
+          assets: merged.finalAssets,
+          transactions: merged.finalTx,
+          monthlyPrices: merged.finalPrices,
+          monthlyNotes: merged.finalNotes,
+          settings: merged.finalSettings,
+          deletedRecordMonths: merged.finalDeletedMonths,
+          deletedIds: merged.finalDeletedIds,
         });
+        setLastSyncedAt(new Date().toLocaleTimeString());
 
-        setTransactions((prevDeviceTx) => {
-          const finalTx = mergeTransactions(cloudData.transactions, prevDeviceTx);
-          saveTransactions(finalTx);
-          return finalTx;
-        });
-
-        setMonthlyPrices((prevDevicePrices) => {
-          const finalPrices = mergeMonthlyPrices(cloudData.monthlyPrices, prevDevicePrices);
-          saveMonthlyPrices(finalPrices);
-          return finalPrices;
-        });
+        if (mergedChecksum !== incomingChecksum && !isUploadingRef.current) {
+          const freshRecords = generateMonthlyRecordsFromLedger(
+            merged.finalTx,
+            merged.finalAssets,
+            merged.finalPrices,
+            livePrices,
+            merged.finalNotes
+          );
+          syncDataToCloud(user.uid, {
+            categories: merged.finalCats,
+            assets: merged.finalAssets,
+            records: freshRecords,
+            transactions: merged.finalTx,
+            monthlyPrices: merged.finalPrices,
+            monthlyNotes: merged.finalNotes,
+            settings: merged.finalSettings,
+            deletedRecordMonths: merged.finalDeletedMonths,
+            deletedIds: merged.finalDeletedIds,
+          }).catch((e) => console.warn('Background reconciliation sync failed:', e));
+        }
       },
-      (err) => console.error("Firestore real-time subscription error:", err)
+      (err) => {
+        console.error('Firestore real-time subscription error:', err);
+      }
     );
 
     return () => {
       unsubscribeSnapshot();
     };
-  }, [user]);
+  }, [user, applyAtomicLocalMerge]);
 
   // Window Focus / Tab Visibility listener to catch up if Device B was in background
   useEffect(() => {
     if (!user) return;
     const handleVisibilityOrFocus = () => {
-      if (document.visibilityState === 'visible') {
-        fetchUserCloudData(user.uid).then((cloudData) => {
-          if (!cloudData) return;
-          const localDeletedMonths = loadDeletedMonths();
-          const finalDeletedMonths = Array.from(
-            new Set([...(cloudData.deletedRecordMonths || []), ...localDeletedMonths])
-          );
-          setTransactions((prev) => {
-            const res = mergeTransactions(cloudData.transactions, prev);
-            saveTransactions(res);
-            return res;
-          });
-          setMonthlyPrices((prev) => {
-            const res = mergeMonthlyPrices(cloudData.monthlyPrices, prev);
-            saveMonthlyPrices(res);
-            return res;
-          });
-        });
+      if (document.visibilityState === 'visible' && !isUploadingRef.current) {
+        fetchUserCloudData(user.uid, { fromServer: true })
+          .then((cloudData) => {
+            if (!cloudData || isUploadingRef.current) return;
+            const merged = applyAtomicLocalMerge(cloudData);
+            const mergedChecksum = computeLedgerChecksum({
+              categories: merged.finalCats,
+              assets: merged.finalAssets,
+              transactions: merged.finalTx,
+            });
+            const incomingChecksum = computeLedgerChecksum({
+              categories: cloudData.categories || [],
+              assets: cloudData.assets || [],
+              transactions: cloudData.transactions || [],
+            });
+
+            setLatestCloudSnapshot({
+              ...cloudData,
+              categories: merged.finalCats,
+              assets: merged.finalAssets,
+              transactions: merged.finalTx,
+              monthlyPrices: merged.finalPrices,
+              monthlyNotes: merged.finalNotes,
+              settings: merged.finalSettings,
+              deletedRecordMonths: merged.finalDeletedMonths,
+              deletedIds: merged.finalDeletedIds,
+            });
+            setLastSyncedAt(new Date().toLocaleTimeString());
+
+            if (mergedChecksum !== incomingChecksum && !isUploadingRef.current) {
+              const freshRecords = generateMonthlyRecordsFromLedger(
+                merged.finalTx,
+                merged.finalAssets,
+                merged.finalPrices,
+                livePrices,
+                merged.finalNotes
+              );
+              syncDataToCloud(user.uid, {
+                categories: merged.finalCats,
+                assets: merged.finalAssets,
+                records: freshRecords,
+                transactions: merged.finalTx,
+                monthlyPrices: merged.finalPrices,
+                monthlyNotes: merged.finalNotes,
+                settings: merged.finalSettings,
+                deletedRecordMonths: merged.finalDeletedMonths,
+                deletedIds: merged.finalDeletedIds,
+              }).catch((e) => console.warn('Visibility background sync failed:', e));
+            }
+          })
+          .catch((err) => console.warn('Visibility cloud sync check failed:', err));
       }
     };
 
@@ -299,7 +576,7 @@ export default function App() {
       window.removeEventListener('focus', handleVisibilityOrFocus);
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
     };
-  }, [user]);
+  }, [user, applyAtomicLocalMerge]);
 
   // Save changes to localStorage
   useEffect(() => {
@@ -443,113 +720,346 @@ export default function App() {
     };
   }, [assets, transactions, monthlyPrices]);
 
-  // Cloud Upload with Union Guard (or explicit overwrite on Backup Restore / Factory Reset)
-  const triggerCloudUpload = async (
+  // Serialized Atomic Cloud Upload Queue with Union Guard & Tombstone Protection
+  const triggerCloudUpload = (
     nextCategories: Category[] = categories,
     nextAssets: Asset[] = assets,
     nextTx: LedgerTransaction[] = transactions,
     nextPrices: MonthlyPriceMap = monthlyPrices,
     nextSettings: AppSettings = settings,
-    overwrite: boolean = false
+    overwrite: boolean = false,
+    nextNotes: MonthlyNotesMap = monthlyNotes,
+    nextDeletedIds?: DeletedIdsMap
   ) => {
-    if (!user) return;
+    if (!user) return Promise.resolve();
+    const uid = user.uid;
+    inFlightUploadsRef.current += 1;
+    isUploadingRef.current = true;
     setIsSyncing(true);
-    try {
-      const deletedMonths = loadDeletedMonths();
-      const nextRecords = generateMonthlyRecordsFromLedger(nextTx, nextAssets, nextPrices, livePrices);
-      const syncResult = await syncDataToCloud(
-        user.uid,
-        {
-          categories: nextCategories,
-          assets: nextAssets,
-          records: nextRecords,
-          transactions: nextTx,
-          monthlyPrices: nextPrices,
-          settings: nextSettings,
-          deletedRecordMonths: deletedMonths,
-        },
-        { overwrite }
-      );
+    setSyncError(null);
 
-      if (syncResult) {
-        setCategories(syncResult.categories);
-        setAssets(syncResult.assets);
-        setTransactions(syncResult.transactions);
-        setMonthlyPrices(syncResult.monthlyPrices);
-        setSettings(syncResult.settings);
-        saveCategories(syncResult.categories);
-        saveAssets(syncResult.assets);
-        saveTransactions(syncResult.transactions);
-        saveMonthlyPrices(syncResult.monthlyPrices);
-        saveSettings(syncResult.settings);
-        saveDeletedMonths(syncResult.deletedRecordMonths);
+    const runUpload = async () => {
+      try {
+        const deletedMonths = loadDeletedMonths();
+        const deletedIds = nextDeletedIds || loadDeletedIds();
+        const nextRecords = generateMonthlyRecordsFromLedger(
+          nextTx,
+          nextAssets,
+          nextPrices,
+          livePrices,
+          nextNotes
+        );
+        const syncResult = await syncDataToCloud(
+          uid,
+          {
+            categories: nextCategories,
+            assets: nextAssets,
+            records: nextRecords,
+            transactions: nextTx,
+            monthlyPrices: nextPrices,
+            monthlyNotes: nextNotes,
+            settings: nextSettings,
+            deletedRecordMonths: deletedMonths,
+            deletedIds,
+          },
+          { overwrite }
+        );
+
+        if (syncResult) {
+          saveCategories(syncResult.categories);
+          saveAssets(syncResult.assets);
+          saveTransactions(syncResult.transactions);
+          saveMonthlyPrices(syncResult.monthlyPrices);
+          saveMonthlyNotes(syncResult.monthlyNotes);
+          saveSettings(syncResult.settings);
+          saveDeletedMonths(syncResult.deletedRecordMonths);
+          saveDeletedIds(syncResult.deletedIds);
+
+          setCategories(syncResult.categories);
+          setAssets(syncResult.assets);
+          setTransactions(syncResult.transactions);
+          setMonthlyPrices(syncResult.monthlyPrices);
+          setMonthlyNotes(syncResult.monthlyNotes);
+          setSettings(syncResult.settings);
+
+          setLatestCloudSnapshot({
+            categories: syncResult.categories,
+            assets: syncResult.assets,
+            records: syncResult.records,
+            transactions: syncResult.transactions,
+            monthlyPrices: syncResult.monthlyPrices,
+            monthlyNotes: syncResult.monthlyNotes,
+            settings: syncResult.settings,
+            deletedRecordMonths: syncResult.deletedRecordMonths,
+            deletedIds: syncResult.deletedIds,
+          });
+          setLastSyncedAt(new Date().toLocaleTimeString());
+        }
+      } catch (err: any) {
+        console.error('Cloud upload/sync error:', err);
+        setSyncError('Cloud sync encountered an error saving changes. Click Sync in the top bar to retry.');
+      } finally {
+        inFlightUploadsRef.current = Math.max(0, inFlightUploadsRef.current - 1);
+        if (inFlightUploadsRef.current === 0) {
+          isUploadingRef.current = false;
+          setIsSyncing(false);
+        }
       }
-    } catch (err) {
-      console.error("Cloud upload/sync error:", err);
-    } finally {
-      setIsSyncing(false);
-    }
+    };
+
+    uploadQueueRef.current = uploadQueueRef.current.then(runUpload, runUpload);
+    return uploadQueueRef.current;
   };
 
-  // Manual Sync trigger for user
+  // Manual Sync & Atomic Union Reconcile trigger
   const handleManualSync = async () => {
     if (!user) return;
     setIsSyncing(true);
+    setSyncError(null);
+    isUploadingRef.current = true;
     try {
-      const cloudData = await fetchUserCloudData(user.uid);
+      const cloudData = await fetchUserCloudData(user.uid, { fromServer: true });
       const localDeletedMonths = loadDeletedMonths();
+      const localDeletedIds = loadDeletedIds();
+
+      const currentLocalCats = loadCategories();
+      const currentLocalAssets = loadAssets();
+      const currentLocalTx = loadTransactions();
+      const currentLocalPrices = loadMonthlyPrices();
+      const currentLocalNotes = loadMonthlyNotes();
+      const currentLocalSettings = loadSettings();
+
       if (cloudData) {
-        const finalDeletedMonths = Array.from(
-          new Set([...(cloudData.deletedRecordMonths || []), ...localDeletedMonths])
+        const {
+          finalCats,
+          finalAssets,
+          finalTx,
+          finalPrices,
+          finalNotes,
+          finalSettings,
+          finalDeletedMonths,
+          finalDeletedIds,
+        } = applyAtomicLocalMerge(cloudData);
+
+        const freshRecords = generateMonthlyRecordsFromLedger(
+          finalTx,
+          finalAssets,
+          finalPrices,
+          livePrices,
+          finalNotes
         );
-        saveDeletedMonths(finalDeletedMonths);
 
-        const currentLocalCats = loadCategories();
-        const currentLocalAssets = loadAssets();
-        const currentLocalTx = loadTransactions();
-        const currentLocalPrices = loadMonthlyPrices();
-        const currentLocalSettings = loadSettings();
-
-        const finalCats = mergeCategories(cloudData.categories, currentLocalCats);
-        const finalAssets = mergeAssets(cloudData.assets, currentLocalAssets);
-        const finalTx = mergeTransactions(cloudData.transactions, currentLocalTx);
-        const finalPrices = mergeMonthlyPrices(cloudData.monthlyPrices, currentLocalPrices);
-        const finalSettings = mergeSettings(cloudData.settings, currentLocalSettings);
-
-        setCategories(finalCats);
-        setAssets(finalAssets);
-        setTransactions(finalTx);
-        setMonthlyPrices(finalPrices);
-        setSettings(finalSettings);
-
-        saveCategories(finalCats);
-        saveAssets(finalAssets);
-        saveTransactions(finalTx);
-        saveMonthlyPrices(finalPrices);
-        saveSettings(finalSettings);
-
-        await syncDataToCloud(user.uid, {
+        const syncResult = await syncDataToCloud(user.uid, {
           categories: finalCats,
           assets: finalAssets,
-          records,
+          records: freshRecords,
           transactions: finalTx,
           monthlyPrices: finalPrices,
+          monthlyNotes: finalNotes,
           settings: finalSettings,
           deletedRecordMonths: finalDeletedMonths,
+          deletedIds: finalDeletedIds,
         });
+
+        if (syncResult) {
+          saveCategories(syncResult.categories);
+          saveAssets(syncResult.assets);
+          saveTransactions(syncResult.transactions);
+          saveMonthlyPrices(syncResult.monthlyPrices);
+          saveMonthlyNotes(syncResult.monthlyNotes);
+          saveSettings(syncResult.settings);
+          saveDeletedMonths(syncResult.deletedRecordMonths);
+          saveDeletedIds(syncResult.deletedIds);
+
+          setCategories(syncResult.categories);
+          setAssets(syncResult.assets);
+          setTransactions(syncResult.transactions);
+          setMonthlyPrices(syncResult.monthlyPrices);
+          setMonthlyNotes(syncResult.monthlyNotes);
+          setSettings(syncResult.settings);
+
+          setLatestCloudSnapshot({
+            categories: syncResult.categories,
+            assets: syncResult.assets,
+            records: syncResult.records,
+            transactions: syncResult.transactions,
+            monthlyPrices: syncResult.monthlyPrices,
+            monthlyNotes: syncResult.monthlyNotes,
+            settings: syncResult.settings,
+            deletedRecordMonths: syncResult.deletedRecordMonths,
+            deletedIds: syncResult.deletedIds,
+          });
+          setLastSyncedAt(new Date().toLocaleTimeString());
+        }
+      } else {
+        const freshRecords = generateMonthlyRecordsFromLedger(
+          currentLocalTx,
+          currentLocalAssets,
+          currentLocalPrices,
+          livePrices,
+          currentLocalNotes
+        );
+        const syncResult = await syncDataToCloud(user.uid, {
+          categories: currentLocalCats,
+          assets: currentLocalAssets,
+          records: freshRecords,
+          transactions: currentLocalTx,
+          monthlyPrices: currentLocalPrices,
+          monthlyNotes: currentLocalNotes,
+          settings: currentLocalSettings,
+          deletedRecordMonths: localDeletedMonths,
+          deletedIds: localDeletedIds,
+        });
+        if (syncResult) {
+          setLatestCloudSnapshot({
+            categories: syncResult.categories,
+            assets: syncResult.assets,
+            records: syncResult.records,
+            transactions: syncResult.transactions,
+            monthlyPrices: syncResult.monthlyPrices,
+            monthlyNotes: syncResult.monthlyNotes,
+            settings: syncResult.settings,
+            deletedRecordMonths: syncResult.deletedRecordMonths,
+            deletedIds: syncResult.deletedIds,
+          });
+          setLastSyncedAt(new Date().toLocaleTimeString());
+        }
+      }
+
+      setSyncSuccessMsg('Ledger & Cloud Snapshot reconciled atomically.');
+      setTimeout(() => setSyncSuccessMsg(null), 3000);
+    } catch (err: any) {
+      console.error('Manual sync error:', err);
+      setSyncError('Manual sync failed. Please check your connection and try again.');
+    } finally {
+      isUploadingRef.current = inFlightUploadsRef.current > 0;
+      if (!isUploadingRef.current) {
+        setIsSyncing(false);
+      }
+    }
+  };
+
+  // Explicit Sync Health Reconcile Actions
+  const handleVerifyLiveServer = async () => {
+    if (!user) return;
+    setIsSyncing(true);
+    setSyncError(null);
+    try {
+      const serverSnapshot = await fetchUserCloudData(user.uid, { fromServer: true });
+      if (serverSnapshot) {
+        setLatestCloudSnapshot(serverSnapshot);
+        setLastSyncedAt(new Date().toLocaleTimeString());
       }
     } catch (err) {
-      console.error("Manual sync error:", err);
+      console.error('Server snapshot verification error:', err);
+      setSyncError('Could not verify live server snapshot. Please check your connection.');
     } finally {
       setIsSyncing(false);
     }
   };
 
+  const handleReconcilePullCloud = async () => {
+    if (!user) return;
+    setIsSyncing(true);
+    setSyncError(null);
+    try {
+      const serverSnapshot = await fetchUserCloudData(user.uid, { fromServer: true });
+      if (serverSnapshot) {
+        const nextCats = serverSnapshot.categories || [];
+        const nextAssets = serverSnapshot.assets || [];
+        const nextTx = serverSnapshot.transactions || [];
+        const nextPrices = serverSnapshot.monthlyPrices || {};
+        const nextNotes = serverSnapshot.monthlyNotes || {};
+        const nextSettings = serverSnapshot.settings || settings;
+        const nextDeletedMonths = serverSnapshot.deletedRecordMonths || [];
+        const nextDeletedIds = serverSnapshot.deletedIds || {
+          categories: [],
+          assets: [],
+          transactions: [],
+        };
+
+        saveCategories(nextCats);
+        saveAssets(nextAssets);
+        saveTransactions(nextTx);
+        saveMonthlyPrices(nextPrices);
+        saveMonthlyNotes(nextNotes);
+        saveSettings(nextSettings);
+        saveDeletedMonths(nextDeletedMonths);
+        saveDeletedIds(nextDeletedIds);
+
+        setCategories(nextCats);
+        setAssets(nextAssets);
+        setTransactions(nextTx);
+        setMonthlyPrices(nextPrices);
+        setMonthlyNotes(nextNotes);
+        setSettings(nextSettings);
+
+        setLatestCloudSnapshot(serverSnapshot);
+        setLastSyncedAt(new Date().toLocaleTimeString());
+        setSyncSuccessMsg('Adopted authoritative Cloud Snapshot on this device.');
+        setTimeout(() => setSyncSuccessMsg(null), 3000);
+      }
+    } catch (err) {
+      console.error('Pull cloud snapshot error:', err);
+      setSyncError('Failed to adopt Cloud Snapshot.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleReconcilePushLocal = async () => {
+    if (!user) return;
+    await triggerCloudUpload(
+      categories,
+      assets,
+      transactions,
+      monthlyPrices,
+      settings,
+      true,
+      monthlyNotes,
+      loadDeletedIds()
+    );
+    setSyncSuccessMsg('Local Ledger atomically pushed to Cloud Snapshot.');
+    setTimeout(() => setSyncSuccessMsg(null), 3000);
+  };
+
+  // Continuous Sync Health Monitor Report
+  const syncHealth = useMemo(
+    () =>
+      computeSyncHealthReport({
+        isAuthenticated: Boolean(user),
+        isSyncing,
+        isCloudLoaded,
+        localCategories: categories,
+        localAssets: assets,
+        localTransactions: transactions,
+        localDeletedIds: loadDeletedIds(),
+        cloudSnapshot: latestCloudSnapshot,
+      }),
+    [user, isSyncing, isCloudLoaded, categories, assets, transactions, latestCloudSnapshot]
+  );
+
   const handleSignIn = async () => {
+    setSyncError(null);
+    setIsSyncing(true);
     try {
       await signInWithGoogle();
-    } catch (error) {
-      console.error("Login failed:", error);
+      setSyncSuccessMsg('Signed in & connected to Google Cloud Sync.');
+      setTimeout(() => setSyncSuccessMsg(null), 3500);
+    } catch (error: any) {
+      console.error('Login failed:', error);
+      const code = error?.code || '';
+      if (code === 'auth/popup-blocked') {
+        setSyncError('Google Sign-In popup was blocked by your browser. Please allow popups for this site and try again.');
+      } else if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        setSyncError('Google Sign-In window was closed before completing sign-in.');
+      } else if (code === 'auth/unauthorized-domain') {
+        setSyncError('This preview domain is not yet authorized in Firebase Auth settings.');
+      } else {
+        setSyncError(error?.message || 'Google Sign-In failed. Please allow popups and try again.');
+      }
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -558,15 +1068,18 @@ export default function App() {
       await signOutUser();
       setUser(null);
       setIsCloudLoaded(false);
+      setLatestCloudSnapshot(null);
+      setLastSyncedAt(null);
+      setSyncError(null);
     } catch (error) {
-      console.error("Logout failed:", error);
+      console.error('Logout failed:', error);
     }
   };
 
   const handleUpdateSettings = (newSettings: Partial<AppSettings>) => {
     setSettings((prev) => {
       const updated = { ...prev, ...newSettings, currencySymbol: 'NT$' };
-      triggerCloudUpload(categories, assets, transactions, monthlyPrices, updated);
+      triggerCloudUpload(categories, assets, transactions, monthlyPrices, updated, false, monthlyNotes);
       return updated;
     });
   };
@@ -908,7 +1421,7 @@ export default function App() {
     const nextTx = [...transactions, tx];
     setTransactions(nextTx);
     saveTransactions(nextTx);
-    triggerCloudUpload(categories, assets, nextTx, monthlyPrices, settings);
+    triggerCloudUpload(categories, assets, nextTx, monthlyPrices, settings, false, monthlyNotes);
   };
 
   const handleEditTransaction = (id: string, updated: Partial<LedgerTransaction>) => {
@@ -916,14 +1429,24 @@ export default function App() {
     const nextTx = transactions.map((t) => (t.id === id ? { ...t, ...updated, updatedAt: now } : t));
     setTransactions(nextTx);
     saveTransactions(nextTx);
-    triggerCloudUpload(categories, assets, nextTx, monthlyPrices, settings);
+    triggerCloudUpload(categories, assets, nextTx, monthlyPrices, settings, false, monthlyNotes);
   };
 
   const handleDeleteTransaction = (id: string) => {
+    const nextDeletedIds = addDeletedId('transactions', id);
     const nextTx = transactions.filter((t) => t.id !== id);
     setTransactions(nextTx);
     saveTransactions(nextTx);
-    triggerCloudUpload(categories, assets, nextTx, monthlyPrices, settings);
+    triggerCloudUpload(
+      categories,
+      assets,
+      nextTx,
+      monthlyPrices,
+      settings,
+      false,
+      monthlyNotes,
+      nextDeletedIds
+    );
   };
 
   // 1st of Month Price Snapshot Handler
@@ -931,7 +1454,7 @@ export default function App() {
     const nextPrices = setMonthlyPriceSnapshot(monthlyPrices, month, assetId, price);
     setMonthlyPrices(nextPrices);
     saveMonthlyPrices(nextPrices);
-    triggerCloudUpload(categories, assets, transactions, nextPrices, settings, false);
+    triggerCloudUpload(categories, assets, transactions, nextPrices, settings, false, monthlyNotes);
   };
 
   // Monthly Decision & Asset Reminder Notes Handler
@@ -939,7 +1462,7 @@ export default function App() {
     const nextNotes = setMonthNote(monthlyNotes, month, monthNote, assetNotes);
     setMonthlyNotes(nextNotes);
     saveMonthlyNotes(nextNotes);
-    triggerCloudUpload(categories, assets, transactions, monthlyPrices, settings, false);
+    triggerCloudUpload(categories, assets, transactions, monthlyPrices, settings, false, nextNotes);
   };
 
   // Month Record Editor modal handlers (legacy fallback / manual adjustment)
@@ -996,7 +1519,7 @@ export default function App() {
     const nextCats = [...categories, catObj];
     setCategories(nextCats);
     saveCategories(nextCats);
-    triggerCloudUpload(nextCats, assets, transactions, monthlyPrices, settings);
+    triggerCloudUpload(nextCats, assets, transactions, monthlyPrices, settings, false, monthlyNotes);
   };
 
   const handleEditCategory = (id: string, updated: Partial<Category>) => {
@@ -1005,24 +1528,46 @@ export default function App() {
     );
     setCategories(nextCats);
     saveCategories(nextCats);
-    triggerCloudUpload(nextCats, assets, transactions, monthlyPrices, settings);
+    triggerCloudUpload(nextCats, assets, transactions, monthlyPrices, settings, false, monthlyNotes);
   };
 
   const handleDeleteCategory = (id: string, deleteLinkedAssets: boolean = true) => {
+    let nextDeletedIds = addDeletedId('categories', id);
     const nextCats = categories.filter((c) => c.id !== id);
     setCategories(nextCats);
     saveCategories(nextCats);
     if (deleteLinkedAssets) {
-      const tiedAssetIds = new Set(assets.filter((a) => a.categoryId === id).map((a) => a.id));
+      const tiedAssetIds = new Set<string>(
+        assets.filter((a) => a.categoryId === id).map((a) => a.id)
+      );
       if (tiedAssetIds.size > 0) {
+        nextDeletedIds = addDeletedId('assets', Array.from(tiedAssetIds));
         const nextAssets = assets.filter((a) => !tiedAssetIds.has(a.id));
         setAssets(nextAssets);
         saveAssets(nextAssets);
-        triggerCloudUpload(nextCats, nextAssets, transactions, monthlyPrices, settings);
+        triggerCloudUpload(
+          nextCats,
+          nextAssets,
+          transactions,
+          monthlyPrices,
+          settings,
+          false,
+          monthlyNotes,
+          nextDeletedIds
+        );
         return;
       }
     }
-    triggerCloudUpload(nextCats, assets, transactions, monthlyPrices, settings);
+    triggerCloudUpload(
+      nextCats,
+      assets,
+      transactions,
+      monthlyPrices,
+      settings,
+      false,
+      monthlyNotes,
+      nextDeletedIds
+    );
   };
 
   // Asset CRUD
@@ -1036,7 +1581,7 @@ export default function App() {
       categoryIds: Array.from(new Set([...prev.categoryIds, newAst.categoryId])),
       assetIds: Array.from(new Set([...prev.assetIds, astObj.id])),
     }));
-    triggerCloudUpload(categories, nextAssets, transactions, monthlyPrices, settings);
+    triggerCloudUpload(categories, nextAssets, transactions, monthlyPrices, settings, false, monthlyNotes);
   };
 
   const handleAddAssetWithCategory = (
@@ -1078,7 +1623,7 @@ export default function App() {
       assetIds: Array.from(new Set([...prev.assetIds, astObj.id])),
     }));
 
-    triggerCloudUpload(nextCats, nextAssets, transactions, monthlyPrices, settings);
+    triggerCloudUpload(nextCats, nextAssets, transactions, monthlyPrices, settings, false, monthlyNotes);
     return astObj;
   };
 
@@ -1088,17 +1633,29 @@ export default function App() {
     );
     setAssets(nextAssets);
     saveAssets(nextAssets);
-    triggerCloudUpload(categories, nextAssets, transactions, monthlyPrices, settings);
+    triggerCloudUpload(categories, nextAssets, transactions, monthlyPrices, settings, false, monthlyNotes);
   };
 
   const handleDeleteAsset = (id: string) => {
+    const nextDeletedIds = addDeletedId('assets', id);
     const nextAssets = assets.filter((a) => a.id !== id);
     setAssets(nextAssets);
     saveAssets(nextAssets);
-    triggerCloudUpload(categories, nextAssets, transactions, monthlyPrices, settings);
+    triggerCloudUpload(
+      categories,
+      nextAssets,
+      transactions,
+      monthlyPrices,
+      settings,
+      false,
+      monthlyNotes,
+      nextDeletedIds
+    );
   };
 
   const handleReassignAssetAndDelete = (sourceAssetId: string, targetAssetId: string) => {
+    const nowIso = new Date().toISOString();
+    const nextDeletedIds = addDeletedId('assets', sourceAssetId);
     const nextTx = transactions.map((t) => {
       let changed = false;
       let newFrom = t.fromAssetId;
@@ -1111,35 +1668,63 @@ export default function App() {
         newTo = targetAssetId;
         changed = true;
       }
-      return changed ? { ...t, fromAssetId: newFrom, toAssetId: newTo } : t;
+      return changed ? { ...t, fromAssetId: newFrom, toAssetId: newTo, updatedAt: nowIso } : t;
     });
     setTransactions(nextTx);
     saveTransactions(nextTx);
     const nextAssets = assets.filter((a) => a.id !== sourceAssetId);
     setAssets(nextAssets);
     saveAssets(nextAssets);
-    triggerCloudUpload(categories, nextAssets, nextTx, monthlyPrices, settings);
+    triggerCloudUpload(
+      categories,
+      nextAssets,
+      nextTx,
+      monthlyPrices,
+      settings,
+      false,
+      monthlyNotes,
+      nextDeletedIds
+    );
   };
 
   const handleReassignCategoryAndDelete = (sourceCategoryId: string, targetCategoryId: string) => {
-    const nextAssets = assets.map((a) => (a.categoryId === sourceCategoryId ? { ...a, categoryId: targetCategoryId } : a));
+    const nowIso = new Date().toISOString();
+    const nextDeletedIds = addDeletedId('categories', sourceCategoryId);
+    const nextAssets = assets.map((a) =>
+      a.categoryId === sourceCategoryId
+        ? { ...a, categoryId: targetCategoryId, updatedAt: nowIso }
+        : a
+    );
     setAssets(nextAssets);
     saveAssets(nextAssets);
     const nextCats = categories.filter((c) => c.id !== sourceCategoryId);
     setCategories(nextCats);
     saveCategories(nextCats);
-    triggerCloudUpload(nextCats, nextAssets, transactions, monthlyPrices, settings);
+    triggerCloudUpload(
+      nextCats,
+      nextAssets,
+      transactions,
+      monthlyPrices,
+      settings,
+      false,
+      monthlyNotes,
+      nextDeletedIds
+    );
   };
 
   const handleUpdateCategoryTargets = (updatedCategories: Category[]) => {
-    setCategories(updatedCategories);
-    saveCategories(updatedCategories);
-    triggerCloudUpload(updatedCategories, assets, transactions, monthlyPrices, settings);
+    const nowIso = new Date().toISOString();
+    const stamped = updatedCategories.map((c) => ({ ...c, updatedAt: nowIso }));
+    setCategories(stamped);
+    saveCategories(stamped);
+    triggerCloudUpload(stamped, assets, transactions, monthlyPrices, settings, false, monthlyNotes);
   };
 
   // Factory Reset
   const handleResetDemoData = () => {
     resetAllDataToZero();
+    knownCategoryIdsRef.current.clear();
+    knownAssetIdsRef.current.clear();
     setCategories([]);
     setAssets([]);
     setTransactions([]);
@@ -1152,7 +1737,7 @@ export default function App() {
       riskLevels: ['Low', 'Medium', 'High'],
       searchQuery: '',
     });
-    triggerCloudUpload([], [], [], {}, settings, true);
+    triggerCloudUpload([], [], [], {}, settings, true, {}, { categories: [], assets: [], transactions: [] });
   };
 
   const handleRefreshData = () => {
@@ -1170,6 +1755,9 @@ export default function App() {
       }
     });
 
+    knownCategoryIdsRef.current = new Set(nextCats.map((c) => c.id));
+    knownAssetIdsRef.current = new Set(nextAssets.map((a) => a.id));
+
     setCategories(nextCats);
     setAssets(nextAssets);
     setTransactions(nextTx);
@@ -1183,7 +1771,16 @@ export default function App() {
       riskLevels: ['Low', 'Medium', 'High'],
       searchQuery: '',
     });
-    triggerCloudUpload(nextCats, nextAssets, nextTx, nextPrices, nextSettings, true);
+    triggerCloudUpload(
+      nextCats,
+      nextAssets,
+      nextTx,
+      nextPrices,
+      nextSettings,
+      true,
+      nextNotes,
+      { categories: [], assets: [], transactions: [] }
+    );
   };
 
   return (
@@ -1192,7 +1789,7 @@ export default function App() {
       {/* App Header */}
       <Header
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleSelectTab}
         settings={settings}
         onUpdateSettings={handleUpdateSettings}
         onOpenDataModal={() => setIsDataModalOpen(true)}
@@ -1205,10 +1802,94 @@ export default function App() {
         onSignOut={handleSignOut}
         isSyncing={isSyncing}
         onManualSync={handleManualSync}
+        syncHealth={syncHealth}
+        onOpenSyncHealth={() => setIsSyncHealthOpen(true)}
       />
 
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {syncError && (
+          <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              <span className="truncate">{syncError}</span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {user && (
+                <button
+                  onClick={handleManualSync}
+                  disabled={isSyncing}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span>Retry Sync</span>
+                </button>
+              )}
+              <button
+                onClick={() => setSyncError(null)}
+                className="p-1 rounded-lg hover:bg-rose-500/20 text-rose-400 hover:text-rose-200 transition-colors cursor-pointer"
+                title="Dismiss"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Sync Health Drift Alert Banner */}
+        {user && isCloudLoaded && !isSyncing && syncHealth.status === 'drift_detected' && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/35 text-amber-200 text-xs">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+              <div className="min-w-0">
+                <span className="font-bold text-amber-300">
+                  Sync Drift Detected ({syncHealth.totalDriftCount}{' '}
+                  {syncHealth.totalDriftCount === 1 ? 'difference' : 'differences'})
+                </span>
+                <span className="text-slate-300 ml-2">
+                  Local Ledger <code className="font-mono text-amber-300">#{syncHealth.localChecksum}</code>{' '}
+                  differs from Cloud Snapshot{' '}
+                  <code className="font-mono text-amber-300">
+                    #{syncHealth.cloudChecksum || 'N/A'}
+                  </code>
+                  .
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => setIsSyncHealthOpen(true)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-200 border border-slate-700 font-semibold transition-colors cursor-pointer"
+              >
+                <Activity className="w-3 h-3 text-amber-400" />
+                <span>Inspect Drift</span>
+              </button>
+              <button
+                onClick={handleManualSync}
+                disabled={isSyncing}
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <GitMerge className="w-3 h-3" />
+                <span>Reconcile</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {syncSuccessMsg && !syncError && (
+          <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{syncSuccessMsg}</span>
+            </div>
+            <button
+              onClick={() => setSyncSuccessMsg(null)}
+              className="p-1 rounded-lg hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-200 transition-colors cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
         
         {/* KPI Metrics Summary Bar */}
         <MetricsCards
@@ -1331,6 +2012,20 @@ export default function App() {
       </main>
 
       {/* Modals */}
+      <SyncHealthModal
+        isOpen={isSyncHealthOpen}
+        onClose={() => setIsSyncHealthOpen(false)}
+        user={user}
+        isSyncing={isSyncing}
+        syncHealth={syncHealth}
+        lastSyncedAt={lastSyncedAt}
+        onReconcileUnion={handleManualSync}
+        onReconcilePullCloud={handleReconcilePullCloud}
+        onReconcilePushLocal={handleReconcilePushLocal}
+        onVerifyLiveServer={handleVerifyLiveServer}
+        onSignIn={handleSignIn}
+      />
+
       <MonthEditorModal
         isOpen={isMonthEditorOpen}
         onClose={() => setIsMonthEditorOpen(false)}

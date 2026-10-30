@@ -13,10 +13,14 @@ import {
   User as UserIcon,
   RefreshCw,
   Scale,
-  Coins
+  Coins,
+  Activity,
+  AlertTriangle,
+  CheckCircle2
 } from 'lucide-react';
 import { AppSettings } from '../types';
 import { User } from '../lib/firebase';
+import { SyncHealthReport } from '../lib/syncMerge';
 
 interface HeaderProps {
   activeTab: 'dashboard' | 'ledger' | 'spreadsheet' | 'hierarchy' | 'rebalance';
@@ -33,6 +37,8 @@ interface HeaderProps {
   onSignOut: () => void;
   isSyncing?: boolean;
   onManualSync?: () => void;
+  syncHealth?: SyncHealthReport;
+  onOpenSyncHealth?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -47,6 +53,8 @@ export const Header: React.FC<HeaderProps> = ({
   onSignOut,
   isSyncing,
   onManualSync,
+  syncHealth,
+  onOpenSyncHealth,
 }) => {
   const navItems: {
     id: 'dashboard' | 'ledger' | 'spreadsheet' | 'hierarchy' | 'rebalance';
@@ -59,6 +67,8 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'hierarchy', label: 'Assets & Risk', icon: <Layers className="w-3.5 h-3.5" /> },
     { id: 'rebalance', label: 'Rebalance', icon: <Scale className="w-3.5 h-3.5" /> },
   ];
+
+  const isDrift = syncHealth?.status === 'drift_detected';
 
   return (
     <header className="bg-[#080C14]/95 backdrop-blur-md border-b border-slate-800/80 text-slate-100 sticky top-0 z-30">
@@ -152,32 +162,78 @@ export const Header: React.FC<HeaderProps> = ({
               <RotateCcw className="w-3.5 h-3.5" />
             </button>
 
-            {/* Google Sync / Auth Control */}
+            {/* Google Sync / Auth Control & Sync Health Monitor */}
             {user ? (
               <div className="flex items-center gap-1.5 bg-[#0D131F] border border-slate-800 rounded-lg pl-2 pr-1.5 py-1 text-xs shrink-0">
-                {user.photoURL ? (
-                  <img
-                    src={user.photoURL}
-                    alt={user.displayName || 'User'}
-                    referrerPolicy="no-referrer"
-                    className="w-5 h-5 rounded-full border border-emerald-500/40"
+                <div className="relative shrink-0">
+                  {user.photoURL ? (
+                    <img
+                      src={user.photoURL}
+                      alt={user.displayName || 'User'}
+                      referrerPolicy="no-referrer"
+                      className="w-5 h-5 rounded-full border border-emerald-500/40"
+                    />
+                  ) : (
+                    <div className="w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center font-bold">
+                      <UserIcon className="w-3 h-3" />
+                    </div>
+                  )}
+                  <span
+                    className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[#0D131F] ${
+                      isSyncing
+                        ? 'bg-amber-400 animate-pulse'
+                        : isDrift
+                        ? 'bg-amber-400'
+                        : 'bg-emerald-400'
+                    }`}
+                    title={
+                      isSyncing
+                        ? 'Syncing with Google Cloud...'
+                        : isDrift
+                        ? `Sync Drift Detected (${syncHealth?.totalDriftCount} item(s))`
+                        : 'Google Cloud Sync Healthy'
+                    }
                   />
-                ) : (
-                  <div className="w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center justify-center font-bold">
-                    <UserIcon className="w-3 h-3" />
-                  </div>
-                )}
-                <span className="text-[11px] font-medium text-slate-200 truncate max-w-[85px] hidden sm:inline">
+                </div>
+                <span className="text-[11px] font-medium text-slate-200 truncate max-w-[80px] hidden sm:inline">
                   {user.displayName || user.email?.split('@')[0]}
                 </span>
+
+                {/* Sync Health Monitor Trigger */}
+                {onOpenSyncHealth && (
+                  <button
+                    onClick={onOpenSyncHealth}
+                    className={`flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-medium rounded border transition-colors cursor-pointer ${
+                      isDrift
+                        ? 'text-amber-300 bg-amber-500/15 hover:bg-amber-500/25 border-amber-500/40'
+                        : 'text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/25'
+                    }`}
+                    title={
+                      isDrift
+                        ? `Sync Health: Drift Detected (${syncHealth?.totalDriftCount} difference(s)) — Click to Reconcile`
+                        : `Sync Health: Verified In Sync (#${syncHealth?.localChecksum || ''})`
+                    }
+                  >
+                    {isDrift ? (
+                      <AlertTriangle className="w-3 h-3 text-amber-400" />
+                    ) : (
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                    )}
+                    <span className="hidden xl:inline">
+                      {isDrift ? `Drift (${syncHealth?.totalDriftCount})` : 'Healthy'}
+                    </span>
+                  </button>
+                )}
+
                 {onManualSync && (
                   <button
                     onClick={onManualSync}
                     disabled={isSyncing}
-                    className="p-1 text-slate-400 hover:text-emerald-400 rounded hover:bg-slate-800 transition-colors cursor-pointer disabled:opacity-50"
-                    title="Sync Now with Cloud"
+                    className="flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-medium text-slate-300 hover:text-white rounded bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/70 transition-colors cursor-pointer disabled:opacity-50"
+                    title="Sync Now with Google Cloud"
                   >
                     <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin text-emerald-400' : ''}`} />
+                    <span className="hidden 2xl:inline">{isSyncing ? 'Syncing' : 'Sync'}</span>
                   </button>
                 )}
                 <button
@@ -189,14 +245,26 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               </div>
             ) : (
-              <button
-                onClick={onSignIn}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold transition-all cursor-pointer text-xs whitespace-nowrap shrink-0"
-                title="Sign in with Google to sync data across devices"
-              >
-                <Cloud className="w-3.5 h-3.5" />
-                <span>Sync Cloud</span>
-              </button>
+              <div className="flex items-center gap-1.5">
+                {onOpenSyncHealth && (
+                  <button
+                    onClick={onOpenSyncHealth}
+                    className="p-1.5 rounded-lg bg-[#0D131F] border border-slate-800 text-slate-400 hover:text-emerald-400 hover:border-slate-700 transition-all cursor-pointer shrink-0"
+                    title="View Ledger Sync Health Monitor"
+                  >
+                    <Activity className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <button
+                  onClick={onSignIn}
+                  disabled={isSyncing}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold transition-all cursor-pointer text-xs whitespace-nowrap shrink-0 disabled:opacity-60"
+                  title="Sign in with Google to sync data across devices"
+                >
+                  <Cloud className="w-3.5 h-3.5" />
+                  <span>{isSyncing ? 'Connecting...' : 'Sync Cloud'}</span>
+                </button>
+              </div>
             )}
           </div>
         </div>
