@@ -731,18 +731,22 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono text-emerald-400 font-semibold shrink-0">{displaySym}</span>
-                        <input
-                          type="text"
-                          placeholder="Price on 1st of month"
-                          value={priceFormInputs[ast.id] || ''}
-                          onChange={(e) => {
-                            const val = formatNumberWithCommas(e.target.value);
-                            setPriceFormInputs((prev) => ({ ...prev, [ast.id]: val }));
-                          }}
-                          className="w-full bg-[#0D131F] border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-emerald-500 font-semibold"
-                        />
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="text-sm font-mono text-emerald-400 font-bold shrink-0">{displaySym}</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            placeholder="Price on 1st of month"
+                            value={priceFormInputs[ast.id] || ''}
+                            onChange={(e) => {
+                              const val = formatNumberWithCommas(e.target.value);
+                              setPriceFormInputs((prev) => ({ ...prev, [ast.id]: val }));
+                            }}
+                            className="w-full bg-[#0D131F] border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm sm:text-base font-mono text-slate-100 focus:outline-none focus:border-emerald-500 font-bold tracking-wide tabular-nums"
+                          />
+                        </div>
                         {displayCurr !== resolveCurrencyCodeFromSymbolOrCode(currencySymbol) && (
                           <span className="text-[10px] font-mono text-slate-500 shrink-0">
                             ≈ {formatCurrency(convertPriceToNTD(parseFormattedNumber(priceFormInputs[ast.id] || '0'), displayCurr), currencySymbol, false)}

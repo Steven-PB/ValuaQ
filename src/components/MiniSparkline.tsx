@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowUpRight, ArrowDownRight, TrendingUp } from 'lucide-react';
-import { formatCurrency, formatPercent } from '../lib/formatters';
+import { formatCurrency, formatPercent, isLiveMonth } from '../lib/formatters';
 
 export interface SparklinePoint {
   month: string;
@@ -48,10 +48,10 @@ export const MiniSparkline: React.FC<MiniSparklineProps> = ({
     firstPoint.value > 0 ? (sixMonthChange / firstPoint.value) * 100 : 0;
   const isPositive = sixMonthChange >= 0;
 
-  // Formatting month names (e.g. "2024-05" -> "May '24" or "2026-11" -> "Live")
+  // Formatting month names (e.g. "2024-05" -> "May '24" or dynamic live month -> "Live")
   const formatMonthShort = (monthStr: string, isLivePoint?: boolean) => {
     if (!monthStr) return '';
-    if (isLivePoint || monthStr === '2026-11' || monthStr.toLowerCase() === 'live') {
+    if (isLivePoint || isLiveMonth(monthStr)) {
       return 'Live';
     }
     const parts = monthStr.split('-');
@@ -282,7 +282,7 @@ export const MiniSparkline: React.FC<MiniSparklineProps> = ({
               left: `${(activePoint.x / width) * 100}%`,
             }}
           >
-            {activePoint.isLive || activePoint.month === '2026-11' ? (
+            {activePoint.isLive || isLiveMonth(activePoint.month) ? (
               <span className="inline-flex items-center gap-1 text-emerald-400 font-sans font-semibold">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                 <span>Live</span>
@@ -300,7 +300,7 @@ export const MiniSparkline: React.FC<MiniSparklineProps> = ({
           /* Subtle Month Range Footer */
           <div className="flex items-center justify-between text-[9px] text-slate-500 font-mono px-1 -mt-0.5">
             <span>{formatMonthShort(firstPoint.month, firstPoint.isLive)}</span>
-            {lastPoint.isLive || lastPoint.month === '2026-11' ? (
+            {lastPoint.isLive || isLiveMonth(lastPoint.month) ? (
               <span className="inline-flex items-center gap-1 text-emerald-400 font-semibold">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 <span>Live</span>

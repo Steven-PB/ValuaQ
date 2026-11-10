@@ -1463,10 +1463,10 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
       {/* Transaction Add / Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden">
             
             {/* Modal Header */}
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60 shrink-0">
               <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
                 <Coins className="w-5 h-5 text-emerald-400" />
                 <span>{editingTx ? 'Edit Transaction' : 'Record New Transaction'}</span>
@@ -1479,7 +1479,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveModal} className="p-5 space-y-4">
+            <form onSubmit={handleSaveModal} className="p-5 space-y-4 overflow-y-auto flex-1">
               
               {/* Action Selection Tabs (Add vs Convert vs Dividend/Interest) */}
               <div>
@@ -1682,34 +1682,38 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
 
                     return (
                       <div className="space-y-3">
-                        <div className={isNtdCashOrEf ? '' : 'grid grid-cols-1 sm:grid-cols-2 gap-3'}>
+                        <div className="space-y-3">
                           <div>
-                            <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                               {isNtdCashOrEf
                                 ? 'Deposit Amount (NT$)'
-                                : `Deposit Quantity (${selectedToAsset?.isCash ? selectedCurr : 'Coins / Shares / Units'})`}
+                                : `Deposit Quantity / Amount (${selectedToAsset?.isCash ? selectedCurr : 'Coins / Shares / Units'})`}
                             </label>
                             <input
                               type="text"
-                              placeholder={isNtdCashOrEf ? 'e.g. 50,000' : 'e.g. 0.045 or 1,000'}
+                              inputMode="decimal"
+                              autoComplete="off"
+                              placeholder={isNtdCashOrEf ? 'e.g. 50,000 or 100,000,000' : 'e.g. 0.045, 1,000, or 150,000,000'}
                               value={toValueStr}
                               onChange={(e) => setToValueStr(formatNumberWithCommas(e.target.value))}
                               required
-                              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm font-mono text-emerald-400 font-bold focus:outline-none focus:border-emerald-500"
+                              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-base sm:text-lg font-mono text-emerald-400 font-bold tracking-wide focus:outline-none focus:border-emerald-500 tabular-nums"
                             />
                           </div>
 
                           {!isNtdCashOrEf && (
                             <div>
-                              <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                                 Principal Invested / Cost Basis (NT$)
                               </label>
                               <input
                                 type="text"
+                                inputMode="decimal"
+                                autoComplete="off"
                                 placeholder="e.g. 140,000 (Optional exact NTD cost)"
                                 value={fromValueStr}
                                 onChange={(e) => setFromValueStr(formatNumberWithCommas(e.target.value))}
-                                className="w-full bg-slate-950 border border-emerald-500/40 rounded-xl px-3 py-2 text-sm font-mono text-slate-100 font-bold focus:outline-none focus:border-emerald-400"
+                                className="w-full bg-slate-950 border border-emerald-500/40 rounded-xl px-4 py-3 text-base sm:text-lg font-mono text-slate-100 font-bold tracking-wide focus:outline-none focus:border-emerald-400 tabular-nums"
                               />
                             </div>
                           )}
@@ -1758,7 +1762,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                   </div>
 
                   {/* Receiving Asset (Cash for Cash Payout, or Stock/Crypto for DRIP/Staking) */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-3">
                     <div>
                       <label className="block text-[11px] font-medium text-slate-400 mb-1">
                         Payout Destination (Received Into)
@@ -1774,16 +1778,18 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-medium text-slate-400 mb-1">
-                        Quantity / Payout Received
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                        Quantity / Payout Amount Received
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g. 1,500 or 0.15 shares"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        placeholder="e.g. 1,500, 50,000,000, or 0.15 shares"
                         value={toValueStr}
                         onChange={(e) => setToValueStr(formatNumberWithCommas(e.target.value))}
                         required
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-violet-300 font-bold focus:outline-none focus:border-violet-500"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-base sm:text-lg font-mono text-violet-300 font-bold tracking-wide focus:outline-none focus:border-violet-500 tabular-nums"
                       />
                     </div>
                   </div>
@@ -1840,7 +1846,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                   </div>
 
                   {/* Asset to Withdraw From and Quantity */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-3">
                     <div>
                       <label className="block text-[11px] font-medium text-slate-400 mb-1">
                         Asset to Withdraw / Spend From
@@ -1859,12 +1865,14 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                         Withdrawal Quantity / Amount
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g. 10,000"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        placeholder="e.g. 10,000 or 100,000,000"
                         value={fromValueStr}
                         onChange={(e) => {
                           const v = formatNumberWithCommas(e.target.value);
@@ -1872,10 +1880,10 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                           setToValueStr(v);
                         }}
                         required
-                        className={`w-full bg-slate-950 border rounded-xl px-3 py-2 text-xs font-mono font-bold focus:outline-none ${
+                        className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-base sm:text-lg font-mono font-bold tracking-wide focus:outline-none tabular-nums ${
                           parsedModalFromVal > 0 && !convertGuardBandCheck.isValid
                             ? 'border-rose-500 text-rose-400 focus:border-rose-400'
-                            : 'border-slate-800 text-rose-400 focus:border-rose-500'
+                            : 'border-slate-700 text-rose-400 focus:border-rose-500'
                         }`}
                       />
                     </div>
@@ -1992,7 +2000,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                   </div>
 
                   {/* From Section */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-3">
                     <div>
                       <label className="block text-[11px] font-medium text-slate-400 mb-1">
                         From Asset (Tracked Separately)
@@ -2014,19 +2022,21 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-medium text-slate-400 mb-1">
-                        Quantity Deducted
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                        Quantity / Amount Deducted (From)
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g. 33,500"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        placeholder="e.g. 33,500 or 150,000,000"
                         value={fromValueStr}
                         onChange={(e) => setFromValueStr(formatNumberWithCommas(e.target.value))}
                         required
-                        className={`w-full bg-slate-950 border rounded-xl px-3 py-2 text-xs font-mono font-bold focus:outline-none ${
+                        className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-base sm:text-lg font-mono font-bold tracking-wide focus:outline-none tabular-nums ${
                           parsedModalFromVal > 0 && !convertGuardBandCheck.isValid
                             ? 'border-rose-500 text-rose-400 focus:border-rose-400'
-                            : 'border-slate-800 text-rose-400 focus:border-blue-500'
+                            : 'border-slate-700 text-rose-400 focus:border-blue-500'
                         }`}
                       />
                     </div>
@@ -2073,20 +2083,20 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                       <div className="grid grid-cols-3 gap-2 font-mono text-[11px] bg-slate-900/90 p-2 rounded-lg border border-slate-800/80">
                         <div>
                           <div className="text-[9px] text-slate-500 uppercase font-sans">Available</div>
-                          <div className="text-slate-200 font-bold">
+                          <div className="text-slate-200 font-bold break-all">
                             {formatNumberWithCommas(convertGuardBandCheck.effectiveAvailable)}
                           </div>
                         </div>
                         <div>
                           <div className="text-[9px] text-slate-500 uppercase font-sans">Deducting</div>
-                          <div className="text-rose-400 font-bold">
+                          <div className="text-rose-400 font-bold break-all">
                             -{formatNumberWithCommas(parsedModalFromVal)}
                           </div>
                         </div>
                         <div>
                           <div className="text-[9px] text-slate-500 uppercase font-sans">Remaining (&ge; 0)</div>
                           <div
-                            className={`font-bold ${
+                            className={`font-bold break-all ${
                               convertGuardBandCheck.remainingAfterConvert < 0 ||
                               (convertGuardBandCheck.guardBandFloor > 0 &&
                                 convertGuardBandCheck.remainingAfterConvert < convertGuardBandCheck.guardBandFloor)
@@ -2100,7 +2110,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                       </div>
 
                       {/* Optional Custom Guard Band Minimum Reserve Floor per Asset */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/70">
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 border-t border-slate-800/70">
                         <span className="text-[10px] text-slate-400">
                           Minimum Reserve Floor (must stay &ge; 0{convertGuardBandCheck.guardBandFloor > 0 ? ` and ≥ ${formatNumberWithCommas(convertGuardBandCheck.guardBandFloor)}` : ''}):
                         </span>
@@ -2109,6 +2119,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                             <span className="text-[10px] text-slate-500">Min Floor:</span>
                             <input
                               type="text"
+                              inputMode="decimal"
                               placeholder="0"
                               value={
                                 selectedFromAsset.guardBand && selectedFromAsset.guardBand > 0
@@ -2121,7 +2132,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                                   guardBand: val > 0 ? val : 0,
                                 });
                               }}
-                              className="w-24 bg-slate-900 border border-slate-700 rounded-md px-2 py-0.5 text-[10px] font-mono text-amber-300 focus:outline-none focus:border-amber-400"
+                              className="w-40 sm:w-52 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs font-mono text-amber-300 focus:outline-none focus:border-amber-400 tabular-nums"
                               title="Set an optional minimum Guard Band reserve floor for this specific asset"
                             />
                           </div>
@@ -2142,7 +2153,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                   </div>
 
                   {/* To Section */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-3">
                     <div>
                       <label className="block text-[11px] font-medium text-slate-400 mb-1">
                         To Asset (Acquired / Bought)
@@ -2158,16 +2169,18 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-medium text-slate-400 mb-1">
-                        Quantity Acquired
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                        Quantity / Amount Acquired (To)
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g. 2 shares, 10g, 0.05 BTC"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        placeholder="e.g. 2 shares, 10g, 0.05 BTC, or 150,000,000"
                         value={toValueStr}
                         onChange={(e) => setToValueStr(formatNumberWithCommas(e.target.value))}
                         required
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-emerald-400 font-bold focus:outline-none focus:border-blue-500"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-base sm:text-lg font-mono text-emerald-400 font-bold tracking-wide focus:outline-none focus:border-blue-500 tabular-nums"
                       />
                     </div>
                   </div>

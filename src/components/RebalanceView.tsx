@@ -470,28 +470,28 @@ export const RebalanceView: React.FC<RebalanceViewProps> = ({
         {/* Deposit Capital Selector - Only shown in Deposit Only / Cashflow mode */}
         {mode === 'cashflow' && (
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center animate-in fade-in duration-150">
-            <div className="md:col-span-5">
+            <div className="md:col-span-6">
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                 New Capital to Deploy / Deposit Amount
               </label>
               <div className="relative rounded-xl shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-bold font-mono text-xs">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-bold font-mono text-sm">
                   {currencySymbol}
                 </div>
                 <input
                   type="text"
-                  inputMode="numeric"
+                  inputMode="decimal"
                   autoComplete="off"
                   value={depositInput}
                   onChange={handleDepositChange}
                   placeholder="0"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-12 pr-4 py-2.5 text-slate-100 font-mono font-bold text-sm focus:outline-none focus:border-emerald-500 transition-colors tabular-nums"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-14 pr-4 py-3 text-slate-100 font-mono font-bold text-base sm:text-lg tracking-wide focus:outline-none focus:border-emerald-500 transition-colors tabular-nums"
                 />
               </div>
             </div>
 
             {/* Quick Amount Buttons */}
-            <div className="md:col-span-7 flex flex-wrap items-center gap-1.5 pt-1">
+            <div className="md:col-span-6 flex flex-wrap items-center gap-1.5 pt-1">
               {latestRecord && latestRecord.monthlyMoneyInvested > 0 && (
                 <button
                   onClick={() =>

@@ -1,4 +1,5 @@
 import { Asset, LedgerTransaction, MonthlyPriceMap, MonthlyRecord, MonthlyNotesMap } from '../types';
+import { getLiveMonthKey } from './formatters';
 
 /**
  * Determines whether an asset is designated as an Emergency Fund (Safety Net Reserve).
@@ -321,57 +322,56 @@ export function calculateInvestedAtDate(
 
 /**
  * Computes all unique historical months that have occurred up to today, plus the upcoming live month.
- * The active/upcoming live month is November (now is November), e.g. '2026-11'.
- * Historical months are completed past months up to October (e.g. May through Oct 2026).
+ * Because monthly snapshots represent the 1st of each month ("YYYY-MM-01"):
+ * - Once a calendar month begins (e.g. November -> '2026-11'), that month's 1st-of-month snapshot
+ *   is finalized as a historical snapshot ('2026-11' = Nov 2026), and the next month ('2026-12' = Dec 2026)
+ *   dynamically becomes the Live upcoming month.
  */
 export function getTimelineMonths(
   transactions: LedgerTransaction[],
   savedPrices: MonthlyPriceMap
 ): { historicalMonths: string[]; liveUpcomingMonth: string } {
-  const now = new Date();
-  let liveYear = now.getFullYear();
-  let liveMonthNum = now.getMonth() + 1; // 1 - 12
-
-  // The upcoming/live month is November (now is November), e.g. '2026-11'
-  if (liveYear === 2026 && liveMonthNum <= 11) {
-    liveMonthNum = 11;
-  }
-  const liveUpcomingMonth = `${liveYear}-${String(liveMonthNum).padStart(2, '0')}`;
-
+  const liveUpcomingMonth = getLiveMonthKey();
   const monthsSet = new Set<string>();
 
-  // Ensure completed historical months prior to the live month exist (e.g. May to Oct)
-  if (liveUpcomingMonth === '2026-11') {
-    ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10'].forEach((m) => {
-      monthsSet.add(m);
-    });
-  } else {
-    // Collect previous 6 months before live upcoming month
-    const [ly, lm] = liveUpcomingMonth.split('-').map(Number);
-    for (let i = 6; i >= 1; i--) {
-      let dMonth = lm - i;
-      let dYear = ly;
-      while (dMonth <= 0) {
-        dMonth += 12;
-        dYear -= 1;
-      }
-      monthsSet.add(`${dYear}-${String(dMonth).padStart(2, '0')}`);
+  const [ly, lm] = liveUpcomingMonth.split('-').map(Number);
+
+  // Include baseline historical months from 2026-05 up to the month immediately before liveUpcomingMonth
+  let curY = 2026;
+  let curM = 5;
+  while (curY < ly || (curY === ly && curM < lm)) {
+    monthsSet.add(`${curY}-${String(curM).padStart(2, '0')}`);
+    curM += 1;
+    if (curM > 12) {
+      curM = 1;
+      curY += 1;
     }
   }
 
-  // Collect all months from transactions (except the live month)
+  // Also guarantee at least 6 completed historical months prior to liveUpcomingMonth
+  for (let i = 6; i >= 1; i--) {
+    let dMonth = lm - i;
+    let dYear = ly;
+    while (dMonth <= 0) {
+      dMonth += 12;
+      dYear -= 1;
+    }
+    monthsSet.add(`${dYear}-${String(dMonth).padStart(2, '0')}`);
+  }
+
+  // Collect all months from transactions prior to liveUpcomingMonth
   transactions.forEach((tx) => {
     if (tx.date && tx.date.length >= 7) {
       const txMonth = tx.date.slice(0, 7);
-      if (txMonth !== liveUpcomingMonth) {
+      if (txMonth < liveUpcomingMonth) {
         monthsSet.add(txMonth);
       }
     }
   });
 
-  // Collect all months from saved prices (except the live month)
+  // Collect all months from saved prices prior to liveUpcomingMonth
   Object.keys(savedPrices || {}).forEach((m) => {
-    if (m !== liveUpcomingMonth) {
+    if (m < liveUpcomingMonth) {
       monthsSet.add(m);
     }
   });

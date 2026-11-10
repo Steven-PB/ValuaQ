@@ -26,6 +26,7 @@ import {
 } from './lib/syncMerge';
 import { 
   generateMonthlyRecordsFromLedger,
+  getTimelineMonths,
   isEmergencyFundAsset,
   getAssetBasePrice
 } from './lib/ledgerEngine';
@@ -37,7 +38,7 @@ import {
   fetchHistoricalPriceForDate
 } from './lib/marketPriceEngine';
 import { Category, Asset, MonthlyRecord, AppSettings, FilterState, RiskLevel, ChartType, LedgerTransaction, MonthlyPriceMap, MonthlyNotesMap } from './types';
-import { normalizeCurrencyCode, getCurrencySymbolForCode } from './lib/formatters';
+import { normalizeCurrencyCode, getCurrencySymbolForCode, getLiveMonthKey, isLiveMonth } from './lib/formatters';
 import { 
   auth, 
   signInWithGoogle, 
@@ -187,6 +188,17 @@ export default function App() {
   const [isDataModalOpen, setIsDataModalOpen] = useState(false);
   const [deletingRecordId, setDeletingRecordId] = useState<string | null>(null);
 
+  // Track the dynamic upcoming Live month key so if the calendar rolls into a new month while open,
+  // the previous Live month automatically finalizes into a Snapshot and the new upcoming month becomes Live.
+  const [activeLiveMonthKey, setActiveLiveMonthKey] = useState<string>(() => getLiveMonthKey());
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const nextKey = getLiveMonthKey();
+      setActiveLiveMonthKey((prev) => (prev !== nextKey ? nextKey : prev));
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Derive Monthly Records from Ledger Transactions, Monthly Price Snapshots, and Monthly Decision Notes
   // Rule 2 & 4: 1st of month valuation = Qty on 1st of month * Price on 1st of month
   // Upcoming month shows live real-time market data
@@ -196,7 +208,7 @@ export default function App() {
       return loadMonthlyRecords();
     }
     return generated;
-  }, [transactions, assets, monthlyPrices, livePrices, monthlyNotes]);
+  }, [transactions, assets, monthlyPrices, livePrices, monthlyNotes, activeLiveMonthKey]);
 
   // Firebase Auth Observer
   useEffect(() => {
@@ -664,11 +676,15 @@ export default function App() {
   useEffect(() => {
     if (assets.length === 0 || transactions.length === 0) return;
 
-    // Collect all historical months from transactions
-    const historicalMonths = new Set<string>();
+    // Collect all historical months from timeline (including newly finalized months like November) and transactions
+    const { historicalMonths: timelineHistMonths } = getTimelineMonths(transactions, monthlyPrices);
+    const historicalMonths = new Set<string>(timelineHistMonths);
     transactions.forEach((tx) => {
       if (tx.date && tx.date.length >= 7) {
-        historicalMonths.add(tx.date.slice(0, 7));
+        const m = tx.date.slice(0, 7);
+        if (!isLiveMonth(m)) {
+          historicalMonths.add(m);
+        }
       }
     });
 
@@ -719,7 +735,7 @@ export default function App() {
     return () => {
       isCancelled = true;
     };
-  }, [assets, transactions, monthlyPrices]);
+  }, [assets, transactions, monthlyPrices, activeLiveMonthKey]);
 
   // Serialized Atomic Cloud Upload Queue with Union Guard & Tombstone Protection
   const triggerCloudUpload = (

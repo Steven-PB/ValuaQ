@@ -275,18 +275,18 @@ export const MonthEditorModal: React.FC<MonthEditorModalProps> = ({
                 Cash safety net reserve. Total Capital = Total Assets + Emergency Fund.
               </p>
             </div>
-            <div className="w-full sm:w-48">
+            <div className="w-full sm:w-72">
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-mono text-xs">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 font-mono text-xs font-bold">
                   {currencySymbol}
                 </span>
                 <input
                   type="text"
-                  inputMode="numeric"
+                  inputMode="decimal"
                   autoComplete="off"
                   value={emergencyFundInput}
                   onChange={(e) => handleEmergencyFundChange(e.target.value)}
-                  className="w-full bg-slate-900 border border-amber-500/30 text-amber-300 rounded-xl pl-8 pr-3 py-2 font-mono text-xs font-bold focus:outline-none focus:border-amber-400 tabular-nums"
+                  className="w-full bg-slate-900 border border-amber-500/30 text-amber-300 rounded-xl pl-12 pr-3.5 py-2.5 font-mono text-sm font-bold tracking-wide focus:outline-none focus:border-amber-400 tabular-nums"
                   placeholder="0"
                 />
               </div>
@@ -309,16 +309,14 @@ export const MonthEditorModal: React.FC<MonthEditorModalProps> = ({
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3">
               {assets.map((ast) => {
                 const cat = categories.find((c) => c.id === ast.categoryId);
-                const currentVal = assetValues[ast.id] ?? 0;
-                const investedVal = assetInvestedValues[ast.id] ?? 0;
 
                 return (
                   <div
                     key={ast.id}
-                    className="p-3 bg-slate-950/40 border border-slate-800 rounded-xl space-y-2 hover:border-slate-700 transition-all"
+                    className="p-3.5 bg-slate-950/40 border border-slate-800 rounded-xl space-y-2.5 hover:border-slate-700 transition-all"
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-slate-200 truncate pr-2">
@@ -331,20 +329,20 @@ export const MonthEditorModal: React.FC<MonthEditorModalProps> = ({
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-900">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1.5 border-t border-slate-900">
                       <div>
                         <label className="block text-[10px] text-slate-400 mb-1 font-medium">Asset Value</label>
                         <div className="relative">
-                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 font-mono text-[10px]">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-mono text-xs">
                             {currencySymbol}
                           </span>
                           <input
                             type="text"
-                            inputMode="numeric"
+                            inputMode="decimal"
                             autoComplete="off"
                             value={assetValueInputs[ast.id] ?? ''}
                             onChange={(e) => handleAssetValueChange(ast.id, e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-800 text-slate-100 rounded-lg pl-7 pr-2 py-1 font-mono text-xs focus:outline-none focus:border-emerald-500 tabular-nums"
+                            className="w-full bg-slate-900 border border-slate-800 text-slate-100 rounded-xl pl-11 pr-3 py-2 font-mono text-sm font-bold tracking-wide focus:outline-none focus:border-emerald-500 tabular-nums"
                             placeholder="0"
                           />
                         </div>
@@ -353,16 +351,16 @@ export const MonthEditorModal: React.FC<MonthEditorModalProps> = ({
                       <div>
                         <label className="block text-[10px] text-slate-400 mb-1 font-medium">Money Invested</label>
                         <div className="relative">
-                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 font-mono text-[10px]">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-mono text-xs">
                             {currencySymbol}
                           </span>
                           <input
                             type="text"
-                            inputMode="numeric"
+                            inputMode="decimal"
                             autoComplete="off"
                             value={assetInvestedValueInputs[ast.id] ?? ''}
                             onChange={(e) => handleAssetInvestedValueChange(ast.id, e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-800 text-blue-300 rounded-lg pl-7 pr-2 py-1 font-mono text-xs focus:outline-none focus:border-blue-500 tabular-nums"
+                            className="w-full bg-slate-900 border border-slate-800 text-blue-300 rounded-xl pl-11 pr-3 py-2 font-mono text-sm font-bold tracking-wide focus:outline-none focus:border-blue-500 tabular-nums"
                             placeholder="0"
                           />
                         </div>

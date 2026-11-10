@@ -1498,15 +1498,16 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xs text-slate-400 font-mono">1 {astCurrency} =</span>
+                            <span className="text-xs text-slate-400 font-mono shrink-0">1 {astCurrency} =</span>
                             <input
                               type="text"
+                              inputMode="decimal"
                               placeholder={astCurrency === 'USD' ? '32.5' : '1.0'}
                               value={astPrice}
                               onChange={(e) => setAstPrice(e.target.value)}
-                              className="w-28 bg-slate-900 border border-slate-700 text-emerald-400 font-mono font-bold text-xs px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-emerald-500"
+                              className="flex-1 min-w-[160px] bg-slate-900 border border-slate-700 text-emerald-400 font-mono font-bold text-sm px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-500 tabular-nums"
                             />
-                            <span className="text-xs text-slate-400 font-mono">NT$ (TWD)</span>
+                            <span className="text-xs text-slate-400 font-mono shrink-0">NT$ (TWD)</span>
                           </div>
                           <p className="text-[10px] text-slate-400">
                             Total Asset calculates: <strong>Quantity &times; Exchange Rate</strong>. Live market feeds will automatically keep this spot price updated!
@@ -1743,15 +1744,16 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-slate-400 font-mono">1 {astCurrency || 'Unit'} =</span>
+                          <span className="text-xs text-slate-400 font-mono shrink-0">1 {astCurrency || 'Unit'} =</span>
                           <input
                             type="text"
+                            inputMode="decimal"
                             placeholder={astCurrency === 'USD' ? '32.5' : '1.0'}
                             value={astPrice}
                             onChange={(e) => setAstPrice(e.target.value)}
-                            className="w-28 bg-slate-900 border border-slate-700 text-amber-300 font-mono font-bold text-xs px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-amber-500"
+                            className="flex-1 min-w-[160px] bg-slate-900 border border-slate-700 text-amber-300 font-mono font-bold text-sm px-3 py-2 rounded-lg focus:outline-none focus:border-amber-500 tabular-nums"
                           />
-                          <span className="text-xs text-slate-400 font-mono">NT$ (TWD)</span>
+                          <span className="text-xs text-slate-400 font-mono shrink-0">NT$ (TWD)</span>
                         </div>
                       </div>
                     </div>

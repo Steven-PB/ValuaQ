@@ -86,16 +86,33 @@ export function formatPercent(value: number, stealthMode: boolean = false): stri
 }
 
 /**
- * Checks whether a month key corresponds to the current live period (2026-11)
+ * Dynamically computes the upcoming Live month key ("YYYY-MM") based on the current calendar date.
+ * Because monthly snapshots represent the 1st of each month ("YYYY-MM-01"):
+ * - Once a calendar month begins (e.g. November -> 2026-11), that month's 1st-of-month snapshot
+ *   is finalized as "Nov 2026", and the next calendar month (December -> 2026-12) becomes "Live".
+ * - When December arrives, "2026-12" becomes "Dec 2026" and "2027-01" becomes "Live", and so on.
+ */
+export function getLiveMonthKey(now: Date = new Date()): string {
+  let year = now.getFullYear();
+  let nextMonth = now.getMonth() + 2; // getMonth() is 0-indexed (0=Jan..10=Nov -> +2 = 12=Dec)
+  if (nextMonth > 12) {
+    nextMonth = 1;
+    year += 1;
+  }
+  return `${year}-${String(nextMonth).padStart(2, '0')}`;
+}
+
+/**
+ * Checks whether a month key corresponds to the current dynamic live period
  */
 export function isLiveMonth(monthStr?: string | null): boolean {
   if (!monthStr) return false;
   const trimmed = monthStr.trim();
-  return trimmed === '2026-11' || trimmed.toLowerCase() === 'live';
+  return trimmed === getLiveMonthKey() || trimmed.toLowerCase() === 'live';
 }
 
 /**
- * Format month string "2026-01" -> "Jan 2026", or "2026-11" -> "Live"
+ * Format month string "2026-01" -> "Jan 2026", or dynamic live month -> "Live"
  */
 export function formatMonthName(monthStr: string): string {
   if (!monthStr) return monthStr;
@@ -136,27 +153,38 @@ export function getRiskLevelColor(riskLevel: string): string {
 }
 
 /**
- * Live input masking helper: formats a numeric or partial string with thousand separators (commas).
+ * Live input masking helper: formats a numeric or partial string with thousand separators (commas)
+ * without restricting integer length or decimal precision.
  * Examples:
- * "1000000" -> "1,000,000"
- * "12500.5" -> "12,500.5"
+ * "100000000000" -> "100,000,000,000"
+ * "12500.56789123" -> "12,500.56789123"
  * "" -> ""
  */
 export function formatNumberWithCommas(value: string | number | null | undefined): string {
   if (value === '' || value === null || value === undefined) return '';
-  const str = String(value).trim();
+  let str = '';
+  if (typeof value === 'number') {
+    if (!isFinite(value) || isNaN(value)) return '';
+    // Avoid scientific notation (e.g. 1e-7 or 1e+21) when converting numbers to string
+    str =
+      Math.abs(value) > 0 && (Math.abs(value) < 1e-4 || Math.abs(value) >= 1e15)
+        ? value.toLocaleString('en-US', { useGrouping: false, maximumFractionDigits: 12 })
+        : String(value);
+  } else {
+    str = String(value).trim();
+  }
+
   const clean = str.replace(/[^0-9.]/g, '');
   if (!clean) return '';
 
   const parts = clean.split('.');
   let integerPart = parts[0].replace(/^0+(?=\d)/, '');
   if (integerPart === '') integerPart = '0';
-  
+
   const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  
+
   if (parts.length > 1) {
-    // Keep decimal point and up to 4 decimal places
-    const decimals = parts.slice(1).join('').slice(0, 4);
+    const decimals = parts.slice(1).join('');
     return `${formattedInteger}.${decimals}`;
   }
   return formattedInteger;
