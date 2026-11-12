@@ -13,7 +13,11 @@ import {
   Plus,
   X,
   Save,
-  MessageSquareQuote
+  MessageSquareQuote,
+  ChevronDown,
+  ChevronUp,
+  LayoutGrid,
+  Table as TableIcon
 } from 'lucide-react';
 import { Category, Asset, MonthlyRecord } from '../types';
 import {
@@ -63,6 +67,8 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
 }) => {
   const [sortAsc, setSortAsc] = useState<boolean>(false); // default: latest month first (Descending)
   const [selectedYear, setSelectedYear] = useState<string>('ALL');
+  const [mobileDisplayMode, setMobileDisplayMode] = useState<'cards' | 'table'>('cards');
+  const [expandedMobileMonths, setExpandedMobileMonths] = useState<Record<string, boolean>>({});
 
   // Month Price Editor Dialog State
   const [editingPriceMonth, setEditingPriceMonth] = useState<string | null>(null);
@@ -219,21 +225,49 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
     <div className="fintech-card rounded-xl shadow-md overflow-hidden mb-8">
       
       {/* Header & Control Bar */}
-      <div className="p-4 sm:p-5 border-b border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 bg-[#080C14]/60">
+      <div className="p-4 sm:p-5 border-b border-slate-800/80 flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 bg-[#080C14]/60">
         <div>
-          <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-            <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+          <h3 className="fluid-title font-bold text-slate-100 flex items-center gap-2">
+            <FileSpreadsheet className="w-5 h-5 text-emerald-400 shrink-0" />
             <span>Monthly Asset &amp; Quantity Spreadsheet</span>
           </h3>
           <p className="text-xs text-slate-400 mt-0.5">
-            1st of month valuation = <strong>Original Quantity &times; 1st-of-Month Price</strong>. Click <span className="text-amber-400 font-medium">Note</span> to document decisions and reminders for each monthly asset.
+            1st of month valuation = <strong>Original Quantity &times; 1st-of-Month Price</strong>. Tap <span className="text-amber-400 font-medium">Note</span> to document decisions and reminders for each monthly asset.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:justify-end">
+          {/* Mobile View Toggle (Cards vs Full Table on < 768px) */}
+          <div className="md:hidden flex items-center bg-[#080C14] border border-slate-800 rounded-lg p-0.5">
+            <button
+              type="button"
+              onClick={() => setMobileDisplayMode('cards')}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                mobileDisplayMode === 'cards'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Cards</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileDisplayMode('table')}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                mobileDisplayMode === 'table'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <TableIcon className="w-3.5 h-3.5" />
+              <span>Table</span>
+            </button>
+          </div>
+
           {/* Year Filter Dropdown Selector */}
           <div className="flex items-center gap-1.5 text-xs">
-            <span className="font-medium text-slate-400">Year:</span>
+            <span className="font-medium text-slate-400 hidden sm:inline">Year:</span>
             <CustomDropdown
               value={selectedYear}
               onChange={setSelectedYear}
@@ -269,8 +303,217 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
         </div>
       </div>
 
+      {/* Adaptive Mobile Monthly Snapshot Cards (< 768px when Cards mode is selected) */}
+      <div className={`${mobileDisplayMode === 'cards' ? 'block md:hidden' : 'hidden'} divide-y divide-slate-800/70`}>
+        {sortedRecords.length === 0 ? (
+          <div className="p-10 text-center text-slate-500 text-xs">
+            No records found. Record your deposits, conversions, or dividends in the <strong>Ledger</strong> tab!
+          </div>
+        ) : (
+          sortedRecords.map((rec) => {
+            const isLive = !!rec.isLivePending || isLiveMonth(rec.month);
+            let rowTotalAsset = 0;
+            activeAssets.forEach((ast) => {
+              rowTotalAsset += rec.assetValues?.[ast.id] || 0;
+            });
+            const rowEmergencyFund = rec.emergencyFund || 0;
+            const rowTotalCapital = rowTotalAsset + rowEmergencyFund;
+            const invMetrics = investedByMonthMap.get(rec.month);
+            const rowInvested = invMetrics ? invMetrics.totalInvested : (rec.totalMoneyInvested || 0);
+            const rowMonthlyInvested = invMetrics ? invMetrics.monthlyInvested : (rec.monthlyMoneyInvested || 0);
+            const rowMonthlyDiv = rec.monthlyDividendIncome || 0;
+            const floatingPL = rowTotalAsset - rowInvested;
+            const floatingPLPercent = rowInvested > 0 ? (floatingPL / rowInvested) * 100 : 0;
+            const isPositive = floatingPL >= 0;
+
+            const hasCustomMonthNote = Boolean(
+              rec.description &&
+              !rec.description.startsWith('Snapshot for ') &&
+              !rec.description.startsWith('Upcoming Live Real-Time')
+            );
+            const assetNotesCount = rec.assetNotes ? Object.keys(rec.assetNotes).length : 0;
+            const hasAnyNotes = hasCustomMonthNote || assetNotesCount > 0;
+            const isExpanded = Boolean(expandedMobileMonths[rec.month]);
+
+            return (
+              <div
+                key={`mob-rec-${rec.id}`}
+                className={`p-4 space-y-3 ${isLive ? 'bg-emerald-950/15' : 'bg-[#080C14]/40'}`}
+              >
+                {/* Top Row: Month Title + Prices & Note Action Buttons */}
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    {isLive ? (
+                      <div className="flex items-center gap-2">
+                        <span className="relative flex h-2.5 w-2.5 shrink-0">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                        </span>
+                        <span className="text-emerald-400 font-bold text-sm tracking-wide">Live Market</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-bold text-slate-100 text-sm">{formatMonthName(rec.month)}</span>
+                        <span className="text-[11px] font-mono text-slate-500">{rec.month} (1st)</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenPriceEditor(rec)}
+                      className="px-2.5 py-1.5 rounded-lg bg-[#0D131F] hover:bg-slate-800 text-slate-200 hover:text-emerald-400 text-xs font-medium flex items-center gap-1 border border-slate-800 transition-colors cursor-pointer"
+                    >
+                      <Tag className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Prices</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenNoteEditor(rec)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 border transition-colors cursor-pointer ${
+                        hasAnyNotes
+                          ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                          : 'bg-[#0D131F] border-slate-800 text-slate-300'
+                      }`}
+                    >
+                      <StickyNote className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Note{hasAnyNotes ? ` (${assetNotesCount + (hasCustomMonthNote ? 1 : 0)})` : ''}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Key Metrics 2x2 Grid */}
+                <div className="grid grid-cols-2 gap-2 font-mono text-xs">
+                  <div className="p-2.5 rounded-lg bg-[#091224] border border-slate-800/90">
+                    <div className="text-[10px] font-sans text-slate-400">Total Capital</div>
+                    <div className="font-bold text-blue-400 text-sm mt-0.5 tabular-nums">
+                      {formatCurrency(rowTotalCapital, currencySymbol, stealthMode)}
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-[#071917] border border-slate-800/90">
+                    <div className="text-[10px] font-sans text-slate-400">Total Assets</div>
+                    <div className="font-bold text-emerald-400 text-sm mt-0.5 tabular-nums">
+                      {formatCurrency(rowTotalAsset, currencySymbol, stealthMode)}
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-[#0D131F] border border-slate-800/90">
+                    <div className="text-[10px] font-sans text-slate-400">Total Invested</div>
+                    <div className="font-semibold text-sky-300 text-xs mt-0.5 tabular-nums">
+                      {formatCurrency(rowInvested, currencySymbol, stealthMode)}
+                    </div>
+                    {(rowMonthlyInvested !== 0 || rowMonthlyDiv > 0) && (
+                      <div className="text-[10px] text-slate-400 mt-0.5">
+                        {rowMonthlyInvested !== 0 && `${rowMonthlyInvested > 0 ? '+' : ''}${formatCurrency(rowMonthlyInvested, currencySymbol, stealthMode)}`}
+                        {rowMonthlyDiv > 0 && ` · +${formatCurrency(rowMonthlyDiv, currencySymbol, stealthMode)} Yield`}
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-[#0D131F] border border-slate-800/90">
+                    <div className="text-[10px] font-sans text-slate-400">Floating P&amp;L</div>
+                    <div className={`font-bold text-xs mt-0.5 tabular-nums flex items-center gap-1 ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      <span>{isPositive && floatingPL > 0 ? '+' : ''}{formatCurrency(floatingPL, currencySymbol, stealthMode)}</span>
+                      <span className="text-[10px]">({formatPercent(floatingPLPercent, stealthMode)})</span>
+                    </div>
+                    <div className="text-[10px] text-amber-400/90 mt-0.5">
+                      EF: {formatCurrency(rowEmergencyFund, currencySymbol, stealthMode)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Custom Month Decision Note Preview */}
+                {hasCustomMonthNote && (
+                  <div
+                    onClick={() => handleOpenNoteEditor(rec)}
+                    className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/25 text-xs text-amber-200/90 flex items-start justify-between gap-2 cursor-pointer"
+                  >
+                    <span className="line-clamp-2">{rec.description}</span>
+                    <Edit2 className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                  </div>
+                )}
+
+                {/* Expandable Per-Asset Breakdown Drawer */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExpandedMobileMonths((prev) => ({
+                      ...prev,
+                      [rec.month]: !prev[rec.month],
+                    }))
+                  }
+                  className="w-full py-2 px-3 rounded-lg bg-[#0D131F] hover:bg-slate-800/70 border border-slate-800/90 flex items-center justify-between text-xs text-slate-300 font-medium cursor-pointer"
+                >
+                  <span>
+                    {isExpanded ? 'Hide Asset Breakdown' : `Show ${activeAssets.length} Assets Breakdown`}
+                  </span>
+                  {isExpanded ? (
+                    <ChevronUp className="w-4 h-4 text-emerald-400" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-slate-400" />
+                  )}
+                </button>
+
+                {isExpanded && (
+                  <div className="grid grid-cols-1 gap-2 pt-1">
+                    {activeAssets.map((ast) => {
+                      const val = rec.assetValues?.[ast.id] || 0;
+                      const qty = rec.assetQuantities?.[ast.id] ?? 0;
+                      const price = getAssetBasePrice(ast, rec.assetPrices);
+                      const cat = categoryMap.get(ast.categoryId);
+                      const curr = (ast.currency || 'NTD').toUpperCase();
+                      const isBaseCash = ast.isCash && (curr === 'NTD' || curr === 'TWD');
+                      const assetNote = rec.assetNotes?.[ast.id];
+
+                      return (
+                        <div
+                          key={`mob-ast-${rec.id}-${ast.id}`}
+                          className="p-2.5 rounded-lg bg-[#0B111E] border border-slate-800/80 flex flex-col gap-1"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span
+                                className="w-2 h-2 rounded-full shrink-0"
+                                style={{ backgroundColor: cat?.color || '#10b981' }}
+                              />
+                              <span className="font-bold text-xs text-slate-100 truncate">{ast.name}</span>
+                              {ast.tickerSymbol && (
+                                <span className="text-[10px] font-mono text-slate-400 shrink-0">({ast.tickerSymbol})</span>
+                              )}
+                            </div>
+                            <span className="font-mono font-bold text-xs text-slate-100 tabular-nums shrink-0">
+                              {formatCurrency(val, currencySymbol, stealthMode)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                            <span>Qty: {stealthMode ? '••••' : formatNumberWithCommas(qty)}</span>
+                            {!isBaseCash && (
+                              <span className="text-emerald-400">
+                                @{formatAssetUnitPrice(price, ast, stealthMode)}
+                              </span>
+                            )}
+                          </div>
+                          {assetNote && (
+                            <div
+                              onClick={() => handleOpenNoteEditor(rec, ast.id)}
+                              className="mt-1 p-1.5 rounded bg-amber-500/10 border border-amber-500/25 text-[10px] text-amber-300 flex items-center gap-1 cursor-pointer"
+                            >
+                              <StickyNote className="w-3 h-3 text-amber-400 shrink-0" />
+                              <span className="truncate">{assetNote}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+
       {/* Responsive Spreadsheet Table with Pinned Header & Pinned Left Columns */}
-      <div className="overflow-auto max-h-[72vh] relative custom-scrollbar">
+      <div className={`${mobileDisplayMode === 'table' ? 'block' : 'hidden md:block'} overflow-auto max-h-[72dvh] relative custom-scrollbar`}>
         <table className="w-full text-left text-xs border-collapse">
           <thead>
             <tr className="bg-[#080C14] text-slate-400 font-semibold border-b border-slate-800/80 uppercase tracking-wider text-[11px]">
@@ -611,11 +854,12 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
 
       {/* Monthly Prices Editor Modal */}
       {editingPriceMonth && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="fintech-card rounded-xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-800">
+        <div className="modal-overlay-responsive bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="fintech-card modal-sheet-responsive border border-slate-800 shadow-2xl">
+            <div className="w-10 h-1 rounded-full bg-slate-700/80 mx-auto mt-2.5 mb-0.5 sm:hidden shrink-0" />
             
             {/* Header */}
-            <div className="p-5 border-b border-slate-800/80 flex items-center justify-between bg-[#080C14]/60">
+            <div className="p-4 sm:p-5 border-b border-slate-800/80 flex items-center justify-between bg-[#080C14]/60 shrink-0">
               <div>
                 <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
                   <Tag className="w-4 h-4 text-emerald-400" />
@@ -638,138 +882,140 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
               </div>
               <button
                 onClick={() => setEditingPriceMonth(null)}
-                className="text-slate-400 hover:text-slate-200 text-lg leading-none cursor-pointer"
+                className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/70 transition-colors cursor-pointer"
               >
-                &times;
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSavePrices} className="p-5 space-y-4">
-              <p className="text-xs text-slate-400">
-                {isLiveMonth(editingPriceMonth)
-                  ? 'Current live unit prices multiplied by your asset quantities for real-time valuation.'
-                  : `Asset prices on the 1st day of ${formatMonthName(editingPriceMonth)}. These are multiplied by the asset's quantity to calculate monthly valuation.`}
-              </p>
+            <form onSubmit={handleSavePrices} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-4">
+                <p className="text-xs text-slate-400">
+                  {isLiveMonth(editingPriceMonth)
+                    ? 'Current live unit prices multiplied by your asset quantities for real-time valuation.'
+                    : `Asset prices on the 1st day of ${formatMonthName(editingPriceMonth)}. These are multiplied by the asset's quantity to calculate monthly valuation.`}
+                </p>
 
-              <div className="space-y-3 max-h-72 overflow-y-auto no-scrollbar pr-1">
-                {activeAssets.map((ast) => {
-                  const cat = categoryMap.get(ast.categoryId);
-                  const curr = (ast.currency || 'NTD').toUpperCase();
-                  const isBaseCash = ast.isCash && (curr === 'NTD' || curr === 'TWD');
+                <div className="space-y-3">
+                  {activeAssets.map((ast) => {
+                    const cat = categoryMap.get(ast.categoryId);
+                    const curr = (ast.currency || 'NTD').toUpperCase();
+                    const isBaseCash = ast.isCash && (curr === 'NTD' || curr === 'TWD');
 
-                  if (isBaseCash) {
+                    if (isBaseCash) {
+                      return (
+                        <div
+                          key={ast.id}
+                          className="p-2.5 rounded-lg bg-[#080C14] border border-slate-800/80 flex items-center justify-between text-xs"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="w-2.5 h-2.5 rounded-full"
+                              style={{ backgroundColor: cat?.color || '#10b981' }}
+                            />
+                            <span className="font-semibold text-slate-300">{ast.name}</span>
+                            <span className="text-[10px] text-emerald-400 uppercase font-mono">(Cash Base)</span>
+                          </div>
+                          <span className="font-mono text-slate-400">1.00 (Base)</span>
+                        </div>
+                      );
+                    }
+
+                    const displayCurr = getAssetPriceCurrency(ast);
+                    const displaySym = getCurrencySymbolForCode(displayCurr);
+
                     return (
                       <div
                         key={ast.id}
-                        className="p-2.5 rounded-lg bg-[#080C14] border border-slate-800/80 flex items-center justify-between text-xs"
+                        className="p-3 rounded-lg bg-[#080C14] border border-slate-800/80 space-y-1.5"
                       >
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="w-2.5 h-2.5 rounded-full"
-                            style={{ backgroundColor: cat?.color || '#10b981' }}
-                          />
-                          <span className="font-semibold text-slate-300">{ast.name}</span>
-                          <span className="text-[10px] text-emerald-400 uppercase font-mono">(Cash Base)</span>
+                        <div className="flex items-center justify-between text-xs gap-2 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="w-2.5 h-2.5 rounded-full"
+                              style={{ backgroundColor: cat?.color || '#3b82f6' }}
+                            />
+                            <span className="font-semibold text-slate-200">{ast.name}</span>
+                            {ast.isCash ? (
+                              <span className="text-[10px] text-emerald-400 uppercase font-mono">
+                                ({curr} Exchange Rate)
+                              </span>
+                            ) : ast.tickerSymbol ? (
+                              <span className="text-[10px] font-mono text-slate-400">({ast.tickerSymbol})</span>
+                            ) : null}
+                          </div>
+
+                          {onEditAsset && (
+                            <label className="inline-flex items-center gap-1 text-[10px] text-slate-400">
+                              <span>Currency:</span>
+                              <select
+                                value={displayCurr}
+                                onChange={(e) => {
+                                  const newCurr = e.target.value;
+                                  const curVal = parseFormattedNumber(priceFormInputs[ast.id] || '0');
+                                  if (curVal > 0) {
+                                    const inNtd = convertPriceToNTD(curVal, displayCurr);
+                                    const inNew = Math.round(convertPriceFromNTD(inNtd, newCurr) * 10000) / 10000;
+                                    setPriceFormInputs((prev) => ({
+                                      ...prev,
+                                      [ast.id]: formatNumberWithCommas(inNew),
+                                    }));
+                                  }
+                                  onEditAsset(ast.id, { priceCurrency: newCurr });
+                                }}
+                                className="bg-slate-900 border border-slate-700 text-indigo-300 font-mono font-bold text-[10px] rounded px-1.5 py-0.5 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                              >
+                                {SUPPORTED_PRICE_CURRENCIES.map((c) => (
+                                  <option key={c.code} value={c.code}>
+                                    {c.code} ({c.symbol})
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          )}
                         </div>
-                        <span className="font-mono text-slate-400">1.00 (Base)</span>
+
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                          <div className="flex items-center gap-2 flex-1">
+                            <span className="text-sm font-mono text-emerald-400 font-bold shrink-0">{displaySym}</span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              autoComplete="off"
+                              placeholder="Price on 1st of month"
+                              value={priceFormInputs[ast.id] || ''}
+                              onChange={(e) => {
+                                const val = formatNumberWithCommas(e.target.value);
+                                setPriceFormInputs((prev) => ({ ...prev, [ast.id]: val }));
+                              }}
+                              className="w-full min-h-[2.75rem] bg-[#0D131F] border border-slate-700/80 rounded-xl px-3.5 py-2 text-sm sm:text-base font-mono text-slate-100 focus:outline-none focus:border-emerald-500 font-bold tracking-wide tabular-nums"
+                            />
+                          </div>
+                          {displayCurr !== resolveCurrencyCodeFromSymbolOrCode(currencySymbol) && (
+                            <span className="text-[10px] font-mono text-slate-500 shrink-0">
+                              ≈ {formatCurrency(convertPriceToNTD(parseFormattedNumber(priceFormInputs[ast.id] || '0'), displayCurr), currencySymbol, false)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     );
-                  }
-
-                  const displayCurr = getAssetPriceCurrency(ast);
-                  const displaySym = getCurrencySymbolForCode(displayCurr);
-
-                  return (
-                    <div
-                      key={ast.id}
-                      className="p-3 rounded-lg bg-[#080C14] border border-slate-800/80 space-y-1.5"
-                    >
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="w-2.5 h-2.5 rounded-full"
-                            style={{ backgroundColor: cat?.color || '#3b82f6' }}
-                          />
-                          <span className="font-semibold text-slate-200">{ast.name}</span>
-                          {ast.isCash ? (
-                            <span className="text-[10px] text-emerald-400 uppercase font-mono">
-                              ({curr} Exchange Rate)
-                            </span>
-                          ) : ast.tickerSymbol ? (
-                            <span className="text-[10px] font-mono text-slate-400">({ast.tickerSymbol})</span>
-                          ) : null}
-                        </div>
-
-                        {onEditAsset && (
-                          <label className="inline-flex items-center gap-1 text-[10px] text-slate-400">
-                            <span>Currency:</span>
-                            <select
-                              value={displayCurr}
-                              onChange={(e) => {
-                                const newCurr = e.target.value;
-                                const curVal = parseFormattedNumber(priceFormInputs[ast.id] || '0');
-                                if (curVal > 0) {
-                                  const inNtd = convertPriceToNTD(curVal, displayCurr);
-                                  const inNew = Math.round(convertPriceFromNTD(inNtd, newCurr) * 10000) / 10000;
-                                  setPriceFormInputs((prev) => ({
-                                    ...prev,
-                                    [ast.id]: formatNumberWithCommas(inNew),
-                                  }));
-                                }
-                                onEditAsset(ast.id, { priceCurrency: newCurr });
-                              }}
-                              className="bg-slate-900 border border-slate-700 text-indigo-300 font-mono font-bold text-[10px] rounded px-1.5 py-0.5 focus:outline-none focus:border-indigo-500 cursor-pointer"
-                            >
-                              {SUPPORTED_PRICE_CURRENCIES.map((c) => (
-                                <option key={c.code} value={c.code}>
-                                  {c.code} ({c.symbol})
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        )}
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                        <div className="flex items-center gap-2 flex-1">
-                          <span className="text-sm font-mono text-emerald-400 font-bold shrink-0">{displaySym}</span>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            autoComplete="off"
-                            placeholder="Price on 1st of month"
-                            value={priceFormInputs[ast.id] || ''}
-                            onChange={(e) => {
-                              const val = formatNumberWithCommas(e.target.value);
-                              setPriceFormInputs((prev) => ({ ...prev, [ast.id]: val }));
-                            }}
-                            className="w-full bg-[#0D131F] border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm sm:text-base font-mono text-slate-100 focus:outline-none focus:border-emerald-500 font-bold tracking-wide tabular-nums"
-                          />
-                        </div>
-                        {displayCurr !== resolveCurrencyCodeFromSymbolOrCode(currencySymbol) && (
-                          <span className="text-[10px] font-mono text-slate-500 shrink-0">
-                            ≈ {formatCurrency(convertPriceToNTD(parseFormattedNumber(priceFormInputs[ast.id] || '0'), displayCurr), currencySymbol, false)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                  })}
+                </div>
               </div>
 
-              {/* Actions */}
-              <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-800/80">
+              {/* Sticky Bottom Actions */}
+              <div className="p-4 sm:px-5 border-t border-slate-800/80 bg-[#080C14]/95 flex items-center justify-end gap-2 shrink-0 pb-safe">
                 <button
                   type="button"
                   onClick={() => setEditingPriceMonth(null)}
-                  className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-all cursor-pointer"
+                  className="min-h-[2.75rem] px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold shadow-md shadow-emerald-500/20 transition-all cursor-pointer"
+                  className="min-h-[2.75rem] px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold shadow-md shadow-emerald-500/20 transition-all cursor-pointer"
                 >
                   Save Prices
                 </button>
@@ -781,8 +1027,9 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
 
       {/* Monthly Investment Decision & Asset Notes Editor Modal */}
       {editingNoteMonth && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="fintech-card rounded-xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-800 flex flex-col max-h-[90vh]">
+        <div className="modal-overlay-responsive bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="fintech-card modal-sheet-responsive border border-slate-800 shadow-2xl">
+            <div className="w-10 h-1 rounded-full bg-slate-700/80 mx-auto mt-2.5 mb-0.5 sm:hidden shrink-0" />
             
             {/* Header */}
             <div className="p-4 sm:p-5 border-b border-slate-800/80 flex items-center justify-between bg-[#080C14]/80 shrink-0">
@@ -812,110 +1059,111 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
               </div>
               <button
                 onClick={() => setEditingNoteMonth(null)}
-                className="text-slate-400 hover:text-slate-200 text-lg leading-none cursor-pointer p-1"
+                className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/70 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSaveNotes} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 text-xs">
-              
-              {/* Primary Monthly Decision Reminder */}
-              <div className="space-y-1.5">
-                <label className="block text-slate-200 font-semibold text-xs flex items-center gap-1.5">
-                  <MessageSquareQuote className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Monthly Investment Decision &amp; Strategy Note:</span>
-                </label>
-                <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Record why you made specific investment decisions at this time (e.g., market sentiment, rebalancing rationale, personal goals, macro conditions).
-                </p>
-                <textarea
-                  rows={3}
-                  value={editingMonthNoteText}
-                  onChange={(e) => setEditingMonthNoteText(e.target.value)}
-                  placeholder="e.g. Reallocated 15% from Cash into S&P 500 following dip; paused crypto DCA to build 6-month emergency reserve..."
-                  className="w-full bg-[#080C14] border border-slate-800 rounded-lg p-2.5 text-slate-100 text-xs focus:outline-none focus:border-amber-400/70 font-sans leading-relaxed"
-                />
-              </div>
-
-              {/* Per-Asset Decision Reminders (Accordion / Section) */}
-              <div className="space-y-2 pt-2 border-t border-slate-800/80">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300 font-semibold text-xs">
-                    Asset-Specific Decision Notes (Optional):
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setExpandedAssetNotes(!expandedAssetNotes)}
-                    className="text-[11px] text-amber-400 hover:underline cursor-pointer font-medium"
-                  >
-                    {expandedAssetNotes ? 'Collapse Assets' : `Show Asset Notes (${activeAssets.length})`}
-                  </button>
+            <form onSubmit={handleSaveNotes} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+              <div className="p-4 sm:p-5 space-y-4 overflow-y-auto overscroll-contain flex-1">
+                {/* Primary Monthly Decision Reminder */}
+                <div className="space-y-1.5">
+                  <label className="block text-slate-200 font-semibold text-xs flex items-center gap-1.5">
+                    <MessageSquareQuote className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Monthly Investment Decision &amp; Strategy Note:</span>
+                  </label>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Record why you made specific investment decisions at this time (e.g., market sentiment, rebalancing rationale, personal goals, macro conditions).
+                  </p>
+                  <textarea
+                    rows={3}
+                    value={editingMonthNoteText}
+                    onChange={(e) => setEditingMonthNoteText(e.target.value)}
+                    placeholder="e.g. Reallocated 15% from Cash into S&P 500 following dip; paused crypto DCA to build 6-month emergency reserve..."
+                    className="w-full bg-[#080C14] border border-slate-800 rounded-xl p-3 text-slate-100 text-xs focus:outline-none focus:border-amber-400/70 font-sans leading-relaxed"
+                  />
                 </div>
-                <p className="text-[11px] text-slate-400">
-                  Add reminders on individual assets for this month (e.g., rationale for buying, selling, or holding).
-                </p>
 
-                {expandedAssetNotes && (
-                  <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1 pt-1">
-                    {activeAssets.map((ast) => {
-                      const cat = categoryMap.get(ast.categoryId);
-                      const currentVal = editingAssetNotes[ast.id] || '';
-
-                      return (
-                        <div
-                          key={ast.id}
-                          className="p-2.5 rounded-lg bg-[#080C14] border border-slate-800/90 space-y-1.5"
-                        >
-                          <div className="flex items-center justify-between text-[11px]">
-                            <div className="flex items-center gap-1.5 font-semibold text-slate-200">
-                              <span
-                                className="w-2 h-2 rounded-full"
-                                style={{ backgroundColor: cat?.color || '#3b82f6' }}
-                              />
-                              <span>{ast.name}</span>
-                              {ast.tickerSymbol && (
-                                <span className="font-mono text-slate-400 text-[10px]">({ast.tickerSymbol})</span>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-slate-500 font-mono">
-                              {cat?.name}
-                            </span>
-                          </div>
-
-                          <input
-                            type="text"
-                            value={currentVal}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setEditingAssetNotes((prev) => ({
-                                ...prev,
-                                [ast.id]: val,
-                              }));
-                            }}
-                            placeholder={`Decision note for ${ast.name} (e.g. Bought on pullback, held for yield...)`}
-                            className="w-full bg-[#0D131F] border border-slate-800 rounded-md px-2.5 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-amber-400/60"
-                          />
-                        </div>
-                      );
-                    })}
+                {/* Per-Asset Decision Reminders (Accordion / Section) */}
+                <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-300 font-semibold text-xs">
+                      Asset-Specific Decision Notes (Optional):
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedAssetNotes(!expandedAssetNotes)}
+                      className="text-[11px] text-amber-400 hover:underline cursor-pointer font-medium"
+                    >
+                      {expandedAssetNotes ? 'Collapse Assets' : `Show Asset Notes (${activeAssets.length})`}
+                    </button>
                   </div>
-                )}
+                  <p className="text-[11px] text-slate-400">
+                    Add reminders on individual assets for this month (e.g., rationale for buying, selling, or holding).
+                  </p>
+
+                  {expandedAssetNotes && (
+                    <div className="space-y-2.5 pt-1">
+                      {activeAssets.map((ast) => {
+                        const cat = categoryMap.get(ast.categoryId);
+                        const currentVal = editingAssetNotes[ast.id] || '';
+
+                        return (
+                          <div
+                            key={ast.id}
+                            className="p-2.5 rounded-lg bg-[#080C14] border border-slate-800/90 space-y-1.5"
+                          >
+                            <div className="flex items-center justify-between text-[11px]">
+                              <div className="flex items-center gap-1.5 font-semibold text-slate-200">
+                                <span
+                                  className="w-2 h-2 rounded-full"
+                                  style={{ backgroundColor: cat?.color || '#3b82f6' }}
+                                />
+                                <span>{ast.name}</span>
+                                {ast.tickerSymbol && (
+                                  <span className="font-mono text-slate-400 text-[10px]">({ast.tickerSymbol})</span>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-slate-500 font-mono">
+                                {cat?.name}
+                              </span>
+                            </div>
+
+                            <input
+                              type="text"
+                              value={currentVal}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setEditingAssetNotes((prev) => ({
+                                  ...prev,
+                                  [ast.id]: val,
+                                }));
+                              }}
+                              placeholder={`Decision note for ${ast.name} (e.g. Bought on pullback, held for yield...)`}
+                              className="w-full min-h-[2.5rem] bg-[#0D131F] border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-amber-400/60"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Actions */}
-              <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-800/80 shrink-0">
+              {/* Sticky Bottom Actions */}
+              <div className="p-4 sm:px-5 border-t border-slate-800/80 bg-[#080C14]/95 flex items-center justify-end gap-2 shrink-0 pb-safe">
                 <button
                   type="button"
                   onClick={() => setEditingNoteMonth(null)}
-                  className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-all cursor-pointer"
+                  className="min-h-[2.75rem] px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-md shadow-amber-500/20 transition-all cursor-pointer flex items-center gap-1.5"
+                  className="min-h-[2.75rem] px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-md shadow-amber-500/20 transition-all cursor-pointer flex items-center gap-1.5"
                 >
                   <Save className="w-3.5 h-3.5" />
                   <span>Save Decision Notes</span>

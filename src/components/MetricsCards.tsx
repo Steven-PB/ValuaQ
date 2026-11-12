@@ -139,7 +139,7 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({
                 Assets <span aria-hidden="true">·</span> Emergency Reserve
               </span>
             </div>
-            <div className="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-slate-50 tracking-tight metric-value-compact">
+            <div className="fluid-kpi font-bold font-mono tabular-nums text-slate-50 tracking-tight metric-value-compact">
               {formatCurrency(totalCapital, currencySymbol, stealthMode)}
             </div>
           </div>
@@ -172,7 +172,7 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({
               <span className="font-semibold text-amber-400/90">Emergency Fund</span>
               <span className="text-[11px] text-slate-500">Safety Net Reserve</span>
             </div>
-            <div className="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-amber-300 tracking-tight metric-value-compact">
+            <div className="fluid-kpi font-bold font-mono tabular-nums text-amber-300 tracking-tight metric-value-compact">
               {formatCurrency(emergencyFund, currencySymbol, stealthMode)}
             </div>
           </div>
@@ -267,7 +267,7 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({
                 <span className="text-[11px] text-slate-500">Market Value</span>
               )}
             </div>
-            <div className="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-slate-50 tracking-tight metric-value-compact">
+            <div className="fluid-kpi font-bold font-mono tabular-nums text-slate-50 tracking-tight metric-value-compact">
               {formatCurrency(totalPortfolio, currencySymbol, stealthMode)}
             </div>
           </div>
@@ -296,7 +296,7 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({
                 {formatCurrency(monthlyMoneyInvested, currencySymbol, stealthMode)} this mo
               </span>
             </div>
-            <div className="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-slate-50 tracking-tight metric-value-compact">
+            <div className="fluid-kpi font-bold font-mono tabular-nums text-slate-50 tracking-tight metric-value-compact">
               {formatCurrency(totalMoneyInvested, currencySymbol, stealthMode)}
             </div>
           </div>
@@ -341,7 +341,7 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({
             </div>
 
             <h1
-              className={`text-2xl sm:text-3xl font-bold font-mono tabular-nums tracking-tight metric-value-compact m-0 ${
+              className={`fluid-kpi font-bold font-mono tabular-nums tracking-tight metric-value-compact m-0 ${
                 isPositivePL ? 'text-emerald-400' : 'text-rose-400'
               }`}
             >
@@ -469,14 +469,15 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({
 
       {/* Floating P&L Per-Asset Contribution Breakdown Modal */}
       {isPLModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-150">
-          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl sm:rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="modal-overlay-responsive bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-slate-700/80 modal-sheet-responsive modal-sheet-wide shadow-2xl">
+            <div className="w-10 h-1 rounded-full bg-slate-700/80 mx-auto mt-2.5 mb-0.5 sm:hidden shrink-0" />
             
             {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+            <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60 shrink-0">
               <div className="flex items-center gap-2.5">
                 <div
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center border ${
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center border shrink-0 ${
                     isPositivePL
                       ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
                       : 'bg-rose-500/15 border-rose-500/30 text-rose-400'
@@ -489,20 +490,20 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({
                   )}
                 </div>
                 <div>
-                  <h3 className="text-base sm:text-lg font-bold text-slate-100 flex items-center gap-2">
-                    <span>Floating P&amp;L Contribution Breakdown</span>
+                  <h3 className="text-base sm:text-lg font-bold text-slate-100 flex items-center gap-2 flex-wrap">
+                    <span>Floating P&amp;L Breakdown</span>
                     <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">
                       {assetPLContributions.length} Assets
                     </span>
                   </h3>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Individual asset profit/loss attribution comparing Base Cash (NTD) cost basis against live market valuation.
+                    Individual asset profit/loss attribution comparing cost basis against live market valuation.
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setIsPLModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+                className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer shrink-0"
                 title="Close Window"
               >
                 <X className="w-5 h-5" />
@@ -510,19 +511,19 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({
             </div>
 
             {/* Quick Summary Metrics Strip */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-4 bg-slate-950/40 border-b border-slate-800/80">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5 p-3 sm:p-4 bg-slate-950/40 border-b border-slate-800/80 shrink-0">
               <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5">
                 <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                   Overall Floating P&amp;L
                 </div>
                 <div
-                  className={`text-lg font-bold font-mono tabular-nums mt-0.5 ${
+                  className={`text-sm sm:text-lg font-bold font-mono tabular-nums mt-0.5 ${
                     isPositivePL ? 'text-emerald-400' : 'text-rose-400'
                   }`}
                 >
                   {isPositivePL && floatingPL > 0 ? '+' : ''}
                   {formatCurrency(floatingPL, currencySymbol, stealthMode)}{' '}
-                  <span className="text-xs font-semibold">
+                  <span className="text-[11px] font-semibold">
                     ({formatPercent(floatingPLPercent, stealthMode)})
                   </span>
                 </div>
@@ -532,7 +533,7 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({
                 <div className="text-[10px] font-semibold text-sky-400 uppercase tracking-wider">
                   Total Principal Invested
                 </div>
-                <div className="text-lg font-bold font-mono tabular-nums text-sky-300 mt-0.5">
+                <div className="text-sm sm:text-lg font-bold font-mono tabular-nums text-sky-300 mt-0.5">
                   {formatCurrency(totalMoneyInvested, currencySymbol, stealthMode)}
                 </div>
               </div>
@@ -541,7 +542,7 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({
                 <div className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wider">
                   Active Portfolio Value
                 </div>
-                <div className="text-lg font-bold font-mono tabular-nums text-emerald-300 mt-0.5">
+                <div className="text-sm sm:text-lg font-bold font-mono tabular-nums text-emerald-300 mt-0.5">
                   {formatCurrency(totalPortfolio, currencySymbol, stealthMode)}
                 </div>
               </div>
@@ -550,14 +551,14 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({
                 <div className="text-[10px] font-semibold text-violet-400 uppercase tracking-wider">
                   Passive Yield Included
                 </div>
-                <div className="text-lg font-bold font-mono tabular-nums text-violet-300 mt-0.5">
+                <div className="text-sm sm:text-lg font-bold font-mono tabular-nums text-violet-300 mt-0.5">
                   +{formatCurrency(totalDividendIncome, currencySymbol, stealthMode)}
                 </div>
               </div>
             </div>
 
             {/* Search and Filter Controls */}
-            <div className="p-3 sm:p-4 border-b border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-slate-950/20">
+            <div className="p-3 sm:p-4 border-b border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-slate-950/20 shrink-0">
               <div className="relative text-xs w-full sm:w-64">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
@@ -565,7 +566,7 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({
                   placeholder="Search asset, ticker, category..."
                   value={plSearch}
                   onChange={(e) => setPlSearch(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 text-slate-200 pl-8 pr-3 py-1.5 rounded-xl text-xs focus:outline-none focus:border-emerald-400"
+                  className="w-full min-h-[2.5rem] bg-slate-800 border border-slate-700 text-slate-200 pl-8 pr-3 py-1.5 rounded-xl text-xs focus:outline-none focus:border-emerald-400"
                 />
                 {plSearch && (
                   <button
@@ -595,7 +596,7 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({
                   <button
                     key={tab.id}
                     onClick={() => setPlFilterTab(tab.id as any)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
+                    className={`min-h-[2.25rem] px-2.5 py-1 rounded-lg text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
                       plFilterTab === tab.id
                         ? 'bg-emerald-500 text-slate-950 font-bold shadow-sm'
                         : 'bg-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-700'
@@ -607,8 +608,8 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({
               </div>
             </div>
 
-            {/* Scrollable Per-Asset P&L Attribution Table */}
-            <div className="flex-1 overflow-y-auto overflow-x-auto p-4">
+            {/* Scrollable Per-Asset P&L Attribution (Adaptive Cards on Phone, Table on Tablet & PC) */}
+            <div className="flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
               {filteredPLAssets.length === 0 ? (
                 <div className="p-12 text-center text-slate-500">
                   <TrendingUp className="w-10 h-10 mx-auto text-slate-600 mb-2" />
@@ -618,106 +619,42 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({
                   </p>
                 </div>
               ) : (
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800 uppercase tracking-wider text-[10px]">
-                      <th className="p-3">Asset &amp; Category</th>
-                      <th className="p-3 text-right">Principal Invested</th>
-                      <th className="p-3 text-right">Current Value (Qty &amp; Price)</th>
-                      <th className="p-3 text-right">Passive Yield</th>
-                      <th className="p-3 text-right">P&amp;L Contribution</th>
-                      <th className="p-3 text-right">Return (ROI %)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60 font-sans text-slate-200">
+                <>
+                  {/* Phone Adaptive P&L Cards (< 768px) */}
+                  <div className="md:hidden space-y-2.5">
                     {filteredPLAssets.map((ast) => {
                       const isPos = ast.plAmount >= 0;
                       const impactShare =
                         totalAbsPL > 0 ? (Math.abs(ast.plAmount) / totalAbsPL) * 100 : 0;
 
                       return (
-                        <tr key={ast.id} className="hover:bg-slate-800/40 transition-colors">
-                          {/* Asset Info */}
-                          <td className="p-3">
-                            <div className="flex items-center gap-2">
+                        <div
+                          key={ast.id}
+                          className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2.5"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
                               <span
                                 className="w-2.5 h-2.5 rounded-full shrink-0"
                                 style={{ backgroundColor: ast.categoryColor || '#10b981' }}
                               />
-                              <div>
-                                <div className="font-bold text-slate-100 flex items-center gap-1.5">
-                                  <span>{ast.name}</span>
+                              <div className="min-w-0">
+                                <div className="font-bold text-slate-100 text-xs flex items-center gap-1.5 flex-wrap">
+                                  <span className="truncate">{ast.name}</span>
                                   {ast.tickerSymbol && (
                                     <span className="font-mono text-[10px] text-slate-400 bg-slate-800 px-1.5 py-0.2 rounded border border-slate-700">
                                       {ast.tickerSymbol}
                                     </span>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
-                                  <span>{ast.categoryName}</span>
-                                  <span className="text-slate-600">·</span>
-                                  <span>{ast.riskLevel} Risk</span>
-                                  {ast.isCash && ast.currency && (
-                                    <span className="font-mono text-[9px] text-emerald-400 uppercase">
-                                      [{ast.currency}]
-                                    </span>
-                                  )}
+                                <div className="text-[10px] text-slate-400 mt-0.5">
+                                  {ast.categoryName} · {ast.riskLevel} Risk
                                 </div>
                               </div>
                             </div>
-                          </td>
 
-                          {/* Principal Invested (Cost Basis) */}
-                          <td className="p-3 text-right font-mono tabular-nums text-sky-300 font-semibold">
-                            {formatCurrency(ast.investedCost, currencySymbol, stealthMode)}
-                          </td>
-
-                          {/* Current Market Value + Qty & Unit Price */}
-                          <td className="p-3 text-right font-mono tabular-nums">
-                            <div className="font-bold text-slate-100">
-                              {formatCurrency(ast.currentValue, currencySymbol, stealthMode)}
-                            </div>
-                            <div className="text-[10px] text-slate-400 mt-0.5">
-                              {stealthMode ? '••••' : formatNumberWithCommas(ast.quantity)} units @{' '}
-                              {formatAssetUnitPrice(ast.unitPrice, ast, stealthMode)}
-                            </div>
-                          </td>
-
-                          {/* Passive Yield Earned */}
-                          <td className="p-3 text-right font-mono tabular-nums">
-                            {ast.dividendEarned > 0 ? (
-                              <span className="inline-flex items-center gap-1 text-violet-300 font-semibold">
-                                <Sparkles className="w-3 h-3 text-violet-400" />
-                                +{formatCurrency(ast.dividendEarned, currencySymbol, stealthMode)}
-                              </span>
-                            ) : (
-                              <span className="text-slate-600">—</span>
-                            )}
-                          </td>
-
-                          {/* P&L Contribution ($) */}
-                          <td className="p-3 text-right font-mono tabular-nums">
-                            <div
-                              className={`text-sm font-bold ${
-                                ast.plAmount > 0
-                                  ? 'text-emerald-400'
-                                  : ast.plAmount < 0
-                                  ? 'text-rose-400'
-                                  : 'text-slate-400'
-                              }`}
-                            >
-                              {isPos && ast.plAmount > 0 ? '+' : ''}
-                              {formatCurrency(ast.plAmount, currencySymbol, stealthMode)}
-                            </div>
-                            <div className="text-[10px] text-slate-500 mt-0.5">
-                              {stealthMode ? '••%' : `${impactShare.toFixed(1)}% of P&L impact`}
-                            </div>
-                          </td>
-
-                          {/* Return (ROI %) */}
-                          <td className="p-3 text-right font-mono tabular-nums">
                             <span
-                              className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-xs font-bold border ${
+                              className={`shrink-0 inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-xs font-mono font-bold border ${
                                 ast.plAmount > 0
                                   ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
                                   : ast.plAmount < 0
@@ -727,23 +664,180 @@ export const MetricsCards: React.FC<MetricsCardsProps> = ({
                             >
                               {formatPercent(ast.plPercent, stealthMode)}
                             </span>
-                          </td>
-                        </tr>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-800/80 text-[11px] font-mono tabular-nums">
+                            <div>
+                              <div className="text-[10px] text-slate-500 font-sans">Cost Basis</div>
+                              <div className="text-sky-300 font-semibold mt-0.5">
+                                {formatCurrency(ast.investedCost, currencySymbol, stealthMode)}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-slate-500 font-sans">Current Value</div>
+                              <div className="text-slate-100 font-semibold mt-0.5">
+                                {formatCurrency(ast.currentValue, currencySymbol, stealthMode)}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-[10px] text-slate-500 font-sans">Floating P&amp;L</div>
+                              <div
+                                className={`font-bold mt-0.5 ${
+                                  ast.plAmount > 0
+                                    ? 'text-emerald-400'
+                                    : ast.plAmount < 0
+                                    ? 'text-rose-400'
+                                    : 'text-slate-400'
+                                }`}
+                              >
+                                {isPos && ast.plAmount > 0 ? '+' : ''}
+                                {formatCurrency(ast.plAmount, currencySymbol, stealthMode)}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono pt-1 border-t border-slate-900">
+                            <span>
+                              {stealthMode ? '••••' : formatNumberWithCommas(ast.quantity)} units @{' '}
+                              {formatAssetUnitPrice(ast.unitPrice, ast, stealthMode)}
+                            </span>
+                            <span>
+                              {stealthMode ? '••%' : `${impactShare.toFixed(1)}% of P&L impact`}
+                            </span>
+                          </div>
+                        </div>
                       );
                     })}
-                  </tbody>
-                </table>
+                  </div>
+
+                  {/* Tablet & PC Full Table (>= 768px) */}
+                  <table className="hidden md:table w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800 uppercase tracking-wider text-[10px]">
+                        <th className="p-3">Asset &amp; Category</th>
+                        <th className="p-3 text-right">Principal Invested</th>
+                        <th className="p-3 text-right">Current Value (Qty &amp; Price)</th>
+                        <th className="p-3 text-right">Passive Yield</th>
+                        <th className="p-3 text-right">P&amp;L Contribution</th>
+                        <th className="p-3 text-right">Return (ROI %)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 font-sans text-slate-200">
+                      {filteredPLAssets.map((ast) => {
+                        const isPos = ast.plAmount >= 0;
+                        const impactShare =
+                          totalAbsPL > 0 ? (Math.abs(ast.plAmount) / totalAbsPL) * 100 : 0;
+
+                        return (
+                          <tr key={ast.id} className="hover:bg-slate-800/40 transition-colors">
+                            {/* Asset Info */}
+                            <td className="p-3">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                                  style={{ backgroundColor: ast.categoryColor || '#10b981' }}
+                                />
+                                <div>
+                                  <div className="font-bold text-slate-100 flex items-center gap-1.5">
+                                    <span>{ast.name}</span>
+                                    {ast.tickerSymbol && (
+                                      <span className="font-mono text-[10px] text-slate-400 bg-slate-800 px-1.5 py-0.2 rounded border border-slate-700">
+                                        {ast.tickerSymbol}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
+                                    <span>{ast.categoryName}</span>
+                                    <span className="text-slate-600">·</span>
+                                    <span>{ast.riskLevel} Risk</span>
+                                    {ast.isCash && ast.currency && (
+                                      <span className="font-mono text-[9px] text-emerald-400 uppercase">
+                                        [{ast.currency}]
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Principal Invested (Cost Basis) */}
+                            <td className="p-3 text-right font-mono tabular-nums text-sky-300 font-semibold">
+                              {formatCurrency(ast.investedCost, currencySymbol, stealthMode)}
+                            </td>
+
+                            {/* Current Market Value + Qty & Unit Price */}
+                            <td className="p-3 text-right font-mono tabular-nums">
+                              <div className="font-bold text-slate-100">
+                                {formatCurrency(ast.currentValue, currencySymbol, stealthMode)}
+                              </div>
+                              <div className="text-[10px] text-slate-400 mt-0.5">
+                                {stealthMode ? '••••' : formatNumberWithCommas(ast.quantity)} units @{' '}
+                                {formatAssetUnitPrice(ast.unitPrice, ast, stealthMode)}
+                              </div>
+                            </td>
+
+                            {/* Passive Yield Earned */}
+                            <td className="p-3 text-right font-mono tabular-nums">
+                              {ast.dividendEarned > 0 ? (
+                                <span className="inline-flex items-center gap-1 text-violet-300 font-semibold">
+                                  <Sparkles className="w-3 h-3 text-violet-400" />
+                                  +{formatCurrency(ast.dividendEarned, currencySymbol, stealthMode)}
+                                </span>
+                              ) : (
+                                <span className="text-slate-600">—</span>
+                              )}
+                            </td>
+
+                            {/* P&L Contribution ($) */}
+                            <td className="p-3 text-right font-mono tabular-nums">
+                              <div
+                                className={`text-sm font-bold ${
+                                  ast.plAmount > 0
+                                    ? 'text-emerald-400'
+                                    : ast.plAmount < 0
+                                    ? 'text-rose-400'
+                                    : 'text-slate-400'
+                                }`}
+                              >
+                                {isPos && ast.plAmount > 0 ? '+' : ''}
+                                {formatCurrency(ast.plAmount, currencySymbol, stealthMode)}
+                              </div>
+                              <div className="text-[10px] text-slate-500 mt-0.5">
+                                {stealthMode ? '••%' : `${impactShare.toFixed(1)}% of P&L impact`}
+                              </div>
+                            </td>
+
+                            {/* Return (ROI %) */}
+                            <td className="p-3 text-right font-mono tabular-nums">
+                              <span
+                                className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-xs font-bold border ${
+                                  ast.plAmount > 0
+                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
+                                    : ast.plAmount < 0
+                                    ? 'bg-rose-500/10 text-rose-400 border-rose-500/25'
+                                    : 'bg-slate-800 text-slate-400 border-slate-700'
+                                }`}
+                              >
+                                {formatPercent(ast.plPercent, stealthMode)}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </>
               )}
             </div>
 
             {/* Modal Footer */}
-            <div className="p-3 sm:p-4 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between">
+            <div className="p-3 sm:p-4 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between shrink-0 pb-safe">
               <span className="text-xs text-slate-400">
                 Showing {filteredPLAssets.length} of {assetPLContributions.length} active assets
               </span>
               <button
                 onClick={() => setIsPLModalOpen(false)}
-                className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-all cursor-pointer"
+                className="min-h-[2.5rem] px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-all cursor-pointer"
               >
                 Close Window
               </button>

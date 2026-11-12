@@ -199,11 +199,12 @@ export const MonthEditorModal: React.FC<MonthEditorModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+    <div className="modal-overlay-responsive bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-slate-900 border border-slate-800 modal-sheet-responsive shadow-2xl">
+        <div className="w-10 h-1 rounded-full bg-slate-700/80 mx-auto mt-2.5 mb-0.5 sm:hidden shrink-0" />
         
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
+        <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/50 shrink-0">
           <div className="flex items-center space-x-2">
             <Calendar className="w-5 h-5 text-emerald-400" />
             <h3 className="text-base font-bold text-slate-100">
@@ -212,221 +213,223 @@ export const MonthEditorModal: React.FC<MonthEditorModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg bg-slate-800/60 transition-colors"
+            className="p-2 text-slate-400 hover:text-white rounded-lg bg-slate-800/60 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 space-y-6 text-xs">
-          {error && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden text-xs">
+          <div className="flex-1 overflow-y-auto overscroll-contain custom-scrollbar p-4 sm:p-6 space-y-6">
+            {error && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
 
-          {/* Month Picker & Auto-Calculated Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-950/60 p-4 rounded-xl border border-slate-800">
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-slate-400 font-semibold uppercase tracking-wider">
-                  Target Month
-                </label>
-                <span className="text-[10px] text-amber-400 font-medium">Sequential</span>
-              </div>
-              <input
-                type="month"
-                required
-                value={month}
-                onChange={(e) => {
-                  setMonth(e.target.value);
-                  setError('');
-                }}
-                className="w-full bg-slate-900 border border-slate-700 text-slate-100 rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:border-emerald-500"
-                title="Select target month for snapshot."
-              />
-            </div>
-
-            <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 flex flex-col justify-center">
-              <div className="text-slate-400 font-medium text-[10px] uppercase tracking-wider mb-1 flex items-center gap-1">
-                <span>Monthly Investment</span>
-                <span className="text-emerald-400 text-[9px] font-normal">(Sum of Money Invested)</span>
-              </div>
-              <div className="text-sm font-bold font-mono text-emerald-400">
-                {formatCurrency(calculatedMonthlyInvested, currencySymbol)}
-              </div>
-            </div>
-          </div>
-
-          {/* Emergency Fund Reserve (Safety Net - Excluded from P&L and Invested Capital) */}
-          <div className="bg-slate-950/60 p-4 rounded-xl border border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <span className="font-bold text-amber-400 uppercase tracking-wider text-[11px]">
-                  Emergency Fund (Safety Net Cash Reserve)
-                </span>
-                <span className="px-1.5 py-0.5 bg-amber-500/10 text-amber-300 border border-amber-500/20 rounded text-[9px] font-semibold">
-                  Excluded from P&amp;L
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400">
-                Cash safety net reserve. Total Capital = Total Assets + Emergency Fund.
-              </p>
-            </div>
-            <div className="w-full sm:w-72">
-              <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 font-mono text-xs font-bold">
-                  {currencySymbol}
-                </span>
+            {/* Month Picker & Auto-Calculated Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-slate-400 font-semibold uppercase tracking-wider">
+                    Target Month
+                  </label>
+                  <span className="text-[10px] text-amber-400 font-medium">Sequential</span>
+                </div>
                 <input
-                  type="text"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  value={emergencyFundInput}
-                  onChange={(e) => handleEmergencyFundChange(e.target.value)}
-                  className="w-full bg-slate-900 border border-amber-500/30 text-amber-300 rounded-xl pl-12 pr-3.5 py-2.5 font-mono text-sm font-bold tracking-wide focus:outline-none focus:border-amber-400 tabular-nums"
-                  placeholder="0"
+                  type="month"
+                  required
+                  value={month}
+                  onChange={(e) => {
+                    setMonth(e.target.value);
+                    setError('');
+                  }}
+                  className="w-full min-h-[2.75rem] bg-slate-900 border border-slate-700 text-slate-100 rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:border-emerald-500"
+                  title="Select target month for snapshot."
                 />
               </div>
+
+              <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 flex flex-col justify-center">
+                <div className="text-slate-400 font-medium text-[10px] uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <span>Monthly Investment</span>
+                  <span className="text-emerald-400 text-[9px] font-normal">(Sum of Money Invested)</span>
+                </div>
+                <div className="text-sm font-bold font-mono text-emerald-400">
+                  {formatCurrency(calculatedMonthlyInvested, currencySymbol)}
+                </div>
+              </div>
             </div>
-          </div>
 
-          {/* Asset Values & Per-Asset Invested Amounts */}
-          <div>
-            <h4 className="font-bold text-slate-200 uppercase tracking-wider text-[11px] mb-3 flex items-center justify-between">
-              <span>Asset Portfolio & Investment for {month || 'this month'}:</span>
-              <span className="text-[10px] text-slate-400 font-normal">Asset Value & Money Invested per Asset</span>
-            </h4>
-
-            {assets.length === 0 ? (
-              <div className="p-6 bg-slate-950/60 rounded-xl border border-dashed border-slate-800 text-center space-y-2">
-                <AlertTriangle className="w-6 h-6 text-amber-400 mx-auto" />
-                <p className="text-slate-300 font-semibold text-xs">No Assets Configured</p>
-                <p className="text-slate-500 text-[11px]">
-                  Please create categories and assets in the "Asset Hierarchy Manager" tab first before recording monthly values.
+            {/* Emergency Fund Reserve (Safety Net - Excluded from P&L and Invested Capital) */}
+            <div className="bg-slate-950/60 p-4 rounded-xl border border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                  <span className="font-bold text-amber-400 uppercase tracking-wider text-[11px]">
+                    Emergency Fund (Safety Net Cash Reserve)
+                  </span>
+                  <span className="px-1.5 py-0.5 bg-amber-500/10 text-amber-300 border border-amber-500/20 rounded text-[9px] font-semibold">
+                    Excluded from P&amp;L
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Cash safety net reserve. Total Capital = Total Assets + Emergency Fund.
                 </p>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-3">
-              {assets.map((ast) => {
-                const cat = categories.find((c) => c.id === ast.categoryId);
+              <div className="w-full sm:w-72">
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 font-mono text-xs font-bold">
+                    {currencySymbol}
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    value={emergencyFundInput}
+                    onChange={(e) => handleEmergencyFundChange(e.target.value)}
+                    className="w-full min-h-[2.75rem] bg-slate-900 border border-amber-500/30 text-amber-300 rounded-xl pl-12 pr-3.5 py-2.5 font-mono text-sm font-bold tracking-wide focus:outline-none focus:border-amber-400 tabular-nums"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+            </div>
 
-                return (
-                  <div
-                    key={ast.id}
-                    className="p-3.5 bg-slate-950/40 border border-slate-800 rounded-xl space-y-2.5 hover:border-slate-700 transition-all"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-200 truncate pr-2">
-                        {ast.name}
-                      </span>
-                      {cat && (
-                        <span className={`px-1.5 py-0.5 text-[10px] rounded border font-medium ${getRiskLevelBadgeClass(cat.riskLevel)}`}>
-                          {cat.name} ({cat.riskLevel})
-                        </span>
-                      )}
-                    </div>
+            {/* Asset Values & Per-Asset Invested Amounts */}
+            <div>
+              <h4 className="font-bold text-slate-200 uppercase tracking-wider text-[11px] mb-3 flex items-center justify-between flex-wrap gap-1">
+                <span>Asset Portfolio & Investment for {month || 'this month'}:</span>
+                <span className="text-[10px] text-slate-400 font-normal">Asset Value & Money Invested per Asset</span>
+              </h4>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1.5 border-t border-slate-900">
-                      <div>
-                        <label className="block text-[10px] text-slate-400 mb-1 font-medium">Asset Value</label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-mono text-xs">
-                            {currencySymbol}
+              {assets.length === 0 ? (
+                <div className="p-6 bg-slate-950/60 rounded-xl border border-dashed border-slate-800 text-center space-y-2">
+                  <AlertTriangle className="w-6 h-6 text-amber-400 mx-auto" />
+                  <p className="text-slate-300 font-semibold text-xs">No Assets Configured</p>
+                  <p className="text-slate-500 text-[11px]">
+                    Please create categories and assets in the "Asset Hierarchy Manager" tab first before recording monthly values.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3">
+                  {assets.map((ast) => {
+                    const cat = categories.find((c) => c.id === ast.categoryId);
+
+                    return (
+                      <div
+                        key={ast.id}
+                        className="p-3.5 bg-slate-950/40 border border-slate-800 rounded-xl space-y-2.5 hover:border-slate-700 transition-all"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-slate-200 truncate pr-2">
+                            {ast.name}
                           </span>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            autoComplete="off"
-                            value={assetValueInputs[ast.id] ?? ''}
-                            onChange={(e) => handleAssetValueChange(ast.id, e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-800 text-slate-100 rounded-xl pl-11 pr-3 py-2 font-mono text-sm font-bold tracking-wide focus:outline-none focus:border-emerald-500 tabular-nums"
-                            placeholder="0"
-                          />
+                          {cat && (
+                            <span className={`px-1.5 py-0.5 text-[10px] rounded border font-medium ${getRiskLevelBadgeClass(cat.riskLevel)}`}>
+                              {cat.name} ({cat.riskLevel})
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1.5 border-t border-slate-900">
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-1 font-medium">Asset Value</label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-mono text-xs">
+                                {currencySymbol}
+                              </span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                autoComplete="off"
+                                value={assetValueInputs[ast.id] ?? ''}
+                                onChange={(e) => handleAssetValueChange(ast.id, e.target.value)}
+                                className="w-full min-h-[2.75rem] bg-slate-900 border border-slate-800 text-slate-100 rounded-xl pl-11 pr-3 py-2 font-mono text-sm font-bold tracking-wide focus:outline-none focus:border-emerald-500 tabular-nums"
+                                placeholder="0"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-1 font-medium">Money Invested</label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-mono text-xs">
+                                {currencySymbol}
+                              </span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                autoComplete="off"
+                                value={assetInvestedValueInputs[ast.id] ?? ''}
+                                onChange={(e) => handleAssetInvestedValueChange(ast.id, e.target.value)}
+                                className="w-full min-h-[2.75rem] bg-slate-900 border border-slate-800 text-blue-300 rounded-xl pl-11 pr-3 py-2 font-mono text-sm font-bold tracking-wide focus:outline-none focus:border-blue-500 tabular-nums"
+                                placeholder="0"
+                              />
+                            </div>
+                          </div>
                         </div>
                       </div>
-
-                      <div>
-                        <label className="block text-[10px] text-slate-400 mb-1 font-medium">Money Invested</label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-mono text-xs">
-                            {currencySymbol}
-                          </span>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            autoComplete="off"
-                            value={assetInvestedValueInputs[ast.id] ?? ''}
-                            onChange={(e) => handleAssetInvestedValueChange(ast.id, e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-800 text-blue-300 rounded-xl pl-11 pr-3 py-2 font-mono text-sm font-bold tracking-wide focus:outline-none focus:border-blue-500 tabular-nums"
-                            placeholder="0"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              )}
             </div>
-            )}
-          </div>
 
-          {/* Live Preview Summary Bar */}
-          <div className="p-3 bg-slate-950 border border-emerald-500/20 rounded-xl grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-center">
-            <div className="text-left">
-              <span className="text-slate-400 block text-[10px]">Total Assets:</span>
-              <span className="text-emerald-400 font-bold text-sm">
-                {formatCurrency(previewTotalAsset, currencySymbol)}
-              </span>
+            {/* Live Preview Summary Bar */}
+            <div className="p-3 bg-slate-950 border border-emerald-500/20 rounded-xl grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-center">
+              <div className="text-left">
+                <span className="text-slate-400 block text-[10px]">Total Assets:</span>
+                <span className="text-emerald-400 font-bold text-sm">
+                  {formatCurrency(previewTotalAsset, currencySymbol)}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px]">Emergency Fund:</span>
+                <span className="text-amber-400 font-bold text-sm">
+                  {formatCurrency(emergencyFund, currencySymbol)}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px]">Total Capital:</span>
+                <span className="text-blue-400 font-bold text-sm">
+                  {formatCurrency(previewTotalAsset + emergencyFund, currencySymbol)}
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="text-slate-400 block text-[10px]">Preview Floating P/L:</span>
+                <span className={`font-bold text-sm ${previewFloatingPL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {formatCurrency(previewFloatingPL, currencySymbol)}
+                </span>
+              </div>
             </div>
+
+            {/* Description & Notes */}
             <div>
-              <span className="text-slate-400 block text-[10px]">Emergency Fund:</span>
-              <span className="text-amber-400 font-bold text-sm">
-                {formatCurrency(emergencyFund, currencySymbol)}
-              </span>
-            </div>
-            <div>
-              <span className="text-slate-400 block text-[10px]">Total Capital:</span>
-              <span className="text-blue-400 font-bold text-sm">
-                {formatCurrency(previewTotalAsset + emergencyFund, currencySymbol)}
-              </span>
-            </div>
-            <div className="text-right">
-              <span className="text-slate-400 block text-[10px]">Preview Floating P/L:</span>
-              <span className={`font-bold text-sm ${previewFloatingPL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {formatCurrency(previewFloatingPL, currencySymbol)}
-              </span>
+              <label className="block text-slate-400 font-semibold uppercase tracking-wider mb-1.5">
+                Month Notes & Market Context
+              </label>
+              <textarea
+                rows={2}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="e.g. Dollar cost averaged into US stocks, received crypto dividend, etc."
+                className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl p-3 text-xs focus:outline-none focus:border-emerald-500"
+              />
             </div>
           </div>
 
-          {/* Description & Notes */}
-          <div>
-            <label className="block text-slate-400 font-semibold uppercase tracking-wider mb-1.5">
-              Month Notes & Market Context
-            </label>
-            <textarea
-              rows={2}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="e.g. Dollar cost averaged into US stocks, received crypto dividend, etc."
-              className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl p-3 text-xs focus:outline-none focus:border-emerald-500"
-            />
-          </div>
-
-          {/* Footer Submit Buttons */}
-          <div className="pt-2 flex items-center justify-end space-x-2 border-t border-slate-800">
+          {/* Sticky Footer Submit Buttons */}
+          <div className="p-4 sm:px-6 flex items-center justify-end gap-2 border-t border-slate-800 bg-slate-950/90 shrink-0 pb-safe">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-slate-300 bg-slate-800 hover:bg-slate-700 transition-all font-medium"
+              className="min-h-[2.75rem] px-4 py-2 rounded-xl text-slate-300 bg-slate-800 hover:bg-slate-700 transition-all font-medium cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl text-slate-950 font-bold bg-emerald-400 hover:bg-emerald-300 shadow-md shadow-emerald-500/20 transition-all flex items-center gap-1.5"
+              className="min-h-[2.75rem] px-5 py-2 rounded-xl text-slate-950 font-bold bg-emerald-400 hover:bg-emerald-300 shadow-md shadow-emerald-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
             >
               <Save className="w-4 h-4 stroke-[2.5]" />
               <span>Save Month Record</span>
@@ -438,8 +441,8 @@ export const MonthEditorModal: React.FC<MonthEditorModalProps> = ({
 
       {/* Zero Monthly Invested Safeguard Confirmation Dialog */}
       {showZeroInvestedConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-amber-500/40 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+        <div className="modal-overlay-responsive bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-amber-500/40 modal-sheet-responsive modal-sheet-compact p-6 shadow-2xl space-y-4">
             <div className="flex items-center space-x-3 text-amber-400">
               <AlertTriangle className="w-6 h-6 shrink-0" />
               <h4 className="font-bold text-slate-100 text-base">Monthly Invested is {currencySymbol}0</h4>
@@ -450,18 +453,18 @@ export const MonthEditorModal: React.FC<MonthEditorModalProps> = ({
             <p className="text-xs text-slate-400">
               Are you sure you want to proceed and save this month record with <strong>{currencySymbol}0</strong> new capital invested?
             </p>
-            <div className="flex items-center justify-end space-x-3 pt-2">
+            <div className="flex items-center justify-end gap-3 pt-2 pb-safe">
               <button
                 type="button"
                 onClick={() => setShowZeroInvestedConfirm(false)}
-                className="px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 rounded-xl transition-colors border border-slate-700"
+                className="min-h-[2.75rem] px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 rounded-xl transition-colors border border-slate-700 cursor-pointer"
               >
                 Go Back & Adjust
               </button>
               <button
                 type="button"
                 onClick={executeSave}
-                className="px-4 py-2 text-xs font-bold text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-xl transition-colors font-sans shadow-lg shadow-amber-400/20"
+                className="min-h-[2.75rem] px-4 py-2 text-xs font-bold text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-xl transition-colors font-sans shadow-lg shadow-amber-400/20 cursor-pointer"
               >
                 Confirm & Save
               </button>

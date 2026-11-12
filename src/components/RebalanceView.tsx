@@ -623,12 +623,12 @@ export const RebalanceView: React.FC<RebalanceViewProps> = ({
       </div>
 
       {/* 4. Target vs. Actual Detailed Allocation Grid & Target Editor */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
           <div>
-            <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+            <h3 className="fluid-title font-bold text-slate-100 flex items-center gap-2">
               <Scale className="w-4 h-4 text-emerald-400" />
-              Target vs. Actual Breakdown & Strategy Editor
+              <span>Target vs. Actual Breakdown &amp; Strategy Editor</span>
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
               Fine-tune your desired target percentages. Targets must total 100%.
@@ -638,14 +638,14 @@ export const RebalanceView: React.FC<RebalanceViewProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={handleApplyEqualWeight}
-              className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-medium transition-colors"
+              className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-medium transition-colors cursor-pointer"
               title="Equally distribute 100% across all categories"
             >
               Equal Weight
             </button>
             <button
               onClick={handleNormalizeTargets}
-              className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-medium transition-colors"
+              className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-medium transition-colors cursor-pointer"
               title="Scale current target numbers so they sum to exactly 100%"
             >
               Normalize to 100%
@@ -653,8 +653,128 @@ export const RebalanceView: React.FC<RebalanceViewProps> = ({
           </div>
         </div>
 
-        {/* Dense Financial Table */}
-        <div className="overflow-x-auto -mx-2 sm:mx-0">
+        {/* Adaptive Mobile Target Allocation Cards (< 768px) */}
+        <div className="md:hidden space-y-3">
+          {analysis.items.map((item) => {
+            const targetVal = localTargets[item.categoryId] ?? 0;
+
+            return (
+              <div
+                key={`mob-target-${item.categoryId}`}
+                className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className="w-3 h-3 rounded-full shrink-0"
+                      style={{ backgroundColor: item.categoryColor }}
+                    />
+                    <span className="font-bold text-slate-100 text-xs truncate">{item.categoryName}</span>
+                    <span className="text-[10px] text-slate-500 font-mono shrink-0">({item.riskLevel})</span>
+                  </div>
+                  <span
+                    className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-md shrink-0 ${
+                      item.status === 'underweight'
+                        ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
+                        : item.status === 'overweight'
+                        ? 'bg-rose-500/10 text-rose-300 border border-rose-500/20'
+                        : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
+                    }`}
+                  >
+                    {item.status === 'underweight' ? 'Underweight' : item.status === 'overweight' ? 'Overweight' : 'On Target'}
+                  </span>
+                </div>
+
+                {/* Progress Bar Gauge */}
+                <div className="w-full bg-slate-950 rounded-full h-2.5 relative border border-slate-800 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{
+                      width: `${Math.min(100, item.actualPercent)}%`,
+                      backgroundColor: item.categoryColor,
+                    }}
+                  />
+                  <div
+                    className="absolute top-0 bottom-0 w-1 bg-white shadow-sm z-10"
+                    style={{ left: `${Math.min(100, Math.max(0, targetVal))}%` }}
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-[11px] font-mono bg-slate-900/80 p-2.5 rounded-lg border border-slate-800/80">
+                  <div>
+                    <div className="text-[10px] text-slate-500 font-sans">Current</div>
+                    <div className="text-slate-200 font-semibold truncate">
+                      {formatCurrency(item.currentValue, currencySymbol, stealthMode)}
+                    </div>
+                    <div className="text-[10px] text-slate-400">{item.actualPercent.toFixed(1)}%</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-500 font-sans">Target Value</div>
+                    <div className="text-slate-300 font-semibold truncate">
+                      {formatCurrency(item.targetValue, currencySymbol, stealthMode)}
+                    </div>
+                    <div className="text-[10px] text-emerald-400">Target {targetVal}%</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[10px] text-slate-500 font-sans">Drift</div>
+                    <div
+                      className={`font-bold ${
+                        item.driftPercent < -1.5
+                          ? 'text-amber-400'
+                          : item.driftPercent > 1.5
+                          ? 'text-rose-400'
+                          : 'text-emerald-400'
+                      }`}
+                    >
+                      {item.driftPercent > 0 ? `+${item.driftPercent.toFixed(1)}%` : `${item.driftPercent.toFixed(1)}%`}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Touch-Friendly Target % Input + Stepper */}
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <span className="text-xs font-semibold text-slate-300">Target Allocation %:</span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleTargetChange(item.categoryId, String(Math.max(0, targetVal - 5)))}
+                      className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-mono text-xs font-bold flex items-center justify-center cursor-pointer"
+                    >
+                      -5
+                    </button>
+                    <div className="relative w-24">
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        max="100"
+                        step="1"
+                        placeholder="0"
+                        value={targetInputs[item.categoryId] ?? ''}
+                        onChange={(e) => handleTargetChange(item.categoryId, e.target.value)}
+                        onBlur={() => handleTargetBlur(item.categoryId)}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-2.5 pr-6 py-1.5 text-right text-sm text-slate-100 font-mono font-bold focus:outline-none focus:border-emerald-500 tabular-nums"
+                      />
+                      <span className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-slate-400 font-mono text-xs">
+                        %
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleTargetChange(item.categoryId, String(Math.min(100, targetVal + 5)))}
+                      className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-mono text-xs font-bold flex items-center justify-center cursor-pointer"
+                    >
+                      +5
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Tablet & PC Dense Financial Table (>= 768px) */}
+        <div className="hidden md:block overflow-x-auto -mx-2 sm:mx-0">
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-950/80 text-slate-400 text-[11px] font-semibold uppercase tracking-wider border-b border-slate-800">
               <tr>

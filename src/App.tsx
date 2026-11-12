@@ -1809,10 +1809,32 @@ export default function App() {
     );
   };
 
+  // Ensure focused inputs inside modals/forms smoothly scroll into the visible viewport when the mobile keyboard opens
+  useEffect(() => {
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      const tag = target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+        if (window.innerWidth < 1024) {
+          setTimeout(() => {
+            try {
+              target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            } catch {
+              // ignore if browser does not support options
+            }
+          }, 220);
+        }
+      }
+    };
+    document.addEventListener('focusin', handleFocusIn);
+    return () => document.removeEventListener('focusin', handleFocusIn);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-[#080C14] text-slate-100 font-sans selection:bg-emerald-500 selection:text-slate-950">
+    <div className="min-h-[100dvh] bg-[#080C14] text-slate-100 font-sans selection:bg-emerald-500 selection:text-slate-950 flex flex-col">
       
-      {/* App Header */}
+      {/* App Header & Mobile Bottom Navigation */}
       <Header
         activeTab={activeTab}
         setActiveTab={handleSelectTab}
@@ -1833,7 +1855,7 @@ export default function App() {
       />
 
       {/* Main Container */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5 sm:space-y-6">
         {syncError && (
           <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
             <div className="flex items-center gap-2.5 min-w-0">
@@ -1885,7 +1907,7 @@ export default function App() {
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => setIsSyncHealthOpen(true)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-200 border border-slate-700 font-semibold transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-200 border border-slate-700 font-semibold transition-colors cursor-pointer"
               >
                 <Activity className="w-3 h-3 text-amber-400" />
                 <span>Inspect Drift</span>
@@ -1893,7 +1915,7 @@ export default function App() {
               <button
                 onClick={handleManualSync}
                 disabled={isSyncing}
-                className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition-colors cursor-pointer disabled:opacity-50"
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition-colors cursor-pointer disabled:opacity-50"
               >
                 <GitMerge className="w-3 h-3" />
                 <span>Reconcile</span>
@@ -2081,8 +2103,8 @@ export default function App() {
 
       {/* Delete Record Confirmation Modal */}
       {deletingRecordId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="fintech-card rounded-xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4">
+        <div className="modal-overlay-responsive">
+          <div className="fintech-card modal-sheet-responsive modal-sheet-compact shadow-2xl p-6 text-center space-y-4">
             <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto">
               <Trash2 className="w-6 h-6" />
             </div>
@@ -2095,13 +2117,13 @@ export default function App() {
             <div className="flex items-center gap-2 pt-2">
               <button
                 onClick={() => setDeletingRecordId(null)}
-                className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition-all cursor-pointer"
+                className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition-all cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDeleteRecord}
-                className="flex-1 px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-lg transition-all cursor-pointer"
+                className="flex-1 px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-xl transition-all cursor-pointer"
               >
                 Delete
               </button>
@@ -2110,8 +2132,8 @@ export default function App() {
         </div>
       )}
 
-      {/* Footer */}
-      <footer className="border-t border-slate-900/90 bg-[#080C14] py-6 text-center text-xs text-slate-500">
+      {/* Footer (with bottom padding on phone to clear the fixed bottom tab bar) */}
+      <footer className="border-t border-slate-900/90 bg-[#080C14] py-6 pb-[5.5rem] md:pb-6 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>ValuaQ <span aria-hidden="true">·</span> Quantity-Based Wealth &amp; Risk Engine</span>
           <span className="text-slate-500 font-mono">

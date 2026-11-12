@@ -174,8 +174,9 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
   const priceSnapshotMonthCount = Object.keys(monthlyPrices || {}).length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="fintech-card rounded-xl shadow-2xl max-w-xl w-full p-5 sm:p-6 space-y-5 text-xs max-h-[92vh] flex flex-col">
+    <div className="modal-overlay-responsive bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="fintech-card modal-sheet-responsive shadow-2xl p-4 sm:p-6 space-y-4 text-xs">
+        <div className="w-10 h-1 rounded-full bg-slate-700/80 mx-auto -mt-1 mb-1 sm:hidden shrink-0" />
         
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-slate-800/80 pb-3.5 shrink-0">
@@ -194,7 +195,7 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
           </div>
           <button 
             onClick={onClose} 
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
@@ -223,7 +224,7 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
         )}
 
         {/* Scrollable Content */}
-        <div className="overflow-y-auto space-y-4 pr-1 flex-1">
+        <div className="overflow-y-auto overscroll-contain space-y-4 pr-1 flex-1 min-h-0">
           
           {/* Section 1: Export Backup (.json) */}
           <div className="p-4 bg-[#080C14] rounded-xl border border-slate-800/90 space-y-3.5">
@@ -284,14 +285,14 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
               <button
                 onClick={handleDownloadBackup}
-                className="flex-1 py-2.5 px-4 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="flex-1 min-h-[2.75rem] py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Download className="w-4 h-4" />
                 <span>Export Backup (.json)</span>
               </button>
               <button
                 onClick={handleCopyBackupJson}
-                className="py-2.5 px-3.5 rounded-lg bg-[#0D131F] hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                className="min-h-[2.75rem] py-2.5 px-3.5 rounded-xl bg-[#0D131F] hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                 title="Copy raw JSON backup to clipboard"
               >
                 {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
@@ -326,7 +327,7 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
                 type="file"
                 accept=".json,application/json"
                 onChange={handleJsonFileUpload}
-                className="block w-full text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-emerald-400 hover:file:bg-slate-700 cursor-pointer border border-slate-800 rounded-lg p-1.5 bg-[#0D131F]"
+                className="block w-full text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-emerald-400 hover:file:bg-slate-700 cursor-pointer border border-slate-800 rounded-xl p-1.5 bg-[#0D131F]"
               />
             </div>
 
@@ -342,7 +343,7 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
                   setUploadedFileName(null);
                 }}
                 placeholder='{"version": "2.0.0", "categories": [...], "assets": [...], "transactions": [...]}'
-                className="w-full bg-[#0D131F] border border-slate-800 text-slate-200 rounded-lg p-2.5 font-mono text-[11px] focus:outline-none focus:border-emerald-500/60"
+                className="w-full bg-[#0D131F] border border-slate-800 text-slate-200 rounded-xl p-2.5 font-mono text-[11px] focus:outline-none focus:border-emerald-500/60"
               />
             </div>
 
@@ -375,7 +376,7 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
             <button
               onClick={handleRestoreJson}
               disabled={!importJson.trim()}
-              className="w-full py-2.5 px-4 rounded-lg bg-blue-500 hover:bg-blue-400 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+              className="w-full min-h-[2.75rem] py-2.5 px-4 rounded-xl bg-blue-500 hover:bg-blue-400 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-bold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
             >
               <Upload className="w-4 h-4" />
               <span>Restore App State from JSON</span>
@@ -385,7 +386,7 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2 shrink-0">
+        <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2 shrink-0 pb-safe">
           {!confirmingFactoryReset ? (
             <button
               onClick={() => setConfirmingFactoryReset(true)}
@@ -395,7 +396,7 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
               <span>Factory Reset Data</span>
             </button>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[11px] text-rose-400 font-semibold">Reset all data to zero?</span>
               <button
                 onClick={() => {
@@ -403,13 +404,13 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
                   setConfirmingFactoryReset(false);
                   onClose();
                 }}
-                className="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-semibold text-[11px] cursor-pointer transition-colors"
+                className="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-[11px] cursor-pointer transition-colors"
               >
                 Confirm Reset
               </button>
               <button
                 onClick={() => setConfirmingFactoryReset(false)}
-                className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] cursor-pointer transition-colors"
+                className="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] cursor-pointer transition-colors"
               >
                 Cancel
               </button>
@@ -418,7 +419,7 @@ export const DataManagementModal: React.FC<DataManagementModalProps> = ({
 
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 font-semibold hover:bg-slate-700 transition-all cursor-pointer"
+            className="min-h-[2.5rem] px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-semibold hover:bg-slate-700 transition-all cursor-pointer"
           >
             Close
           </button>

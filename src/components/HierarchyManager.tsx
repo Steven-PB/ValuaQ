@@ -705,32 +705,32 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
     <div className="space-y-8 mb-12">
       
       {/* Overview Banner */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-slate-50 flex items-center gap-2">
-            <Shield className="w-5 h-5 text-emerald-400" />
-            <span>3-Level Asset & Risk Hierarchy Management</span>
+          <h2 className="fluid-title font-bold text-slate-50 flex items-center gap-2">
+            <Shield className="w-5 h-5 text-emerald-400 shrink-0" />
+            <span>3-Level Asset &amp; Risk Hierarchy Management</span>
           </h2>
           <p className="text-xs text-slate-400 mt-1 max-w-2xl">
             Choose assets from the pre-configured catalog (Taiwan stocks, US ETFs, crypto, gold, cash) or define custom assets.
           </p>
         </div>
 
-        <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
+        <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto sm:justify-end">
           <button
             onClick={() => handleOpenCatModal()}
-            className="flex items-center gap-1.5 text-xs font-semibold text-slate-100 bg-slate-800 hover:bg-slate-700 px-3.5 py-2 rounded-xl border border-slate-700 transition-all cursor-pointer"
+            className="flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-100 bg-slate-800 hover:bg-slate-700 px-3.5 py-2.5 rounded-xl border border-slate-700 transition-all cursor-pointer"
           >
-            <Plus className="w-3.5 h-3.5 text-blue-400" />
+            <Plus className="w-3.5 h-3.5 text-blue-400 shrink-0" />
             <span>Add Category</span>
           </button>
 
           <button
             onClick={() => handleOpenAssetModal()}
-            className="flex items-center gap-1.5 text-xs font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 px-4 py-2 rounded-xl shadow-md shadow-emerald-500/20 transition-all cursor-pointer"
+            className="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 px-4 py-2.5 rounded-xl shadow-md shadow-emerald-500/20 transition-all cursor-pointer"
           >
-            <Plus className="w-4 h-4 stroke-[3]" />
-            <span>Add Asset (Catalog)</span>
+            <Plus className="w-4 h-4 stroke-[3] shrink-0" />
+            <span>Add Asset</span>
           </button>
         </div>
       </div>
@@ -960,8 +960,12 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
       {/* ASSET CATALOG SELECTOR & CUSTOM CREATION MODAL */}
       {/* ---------------------------------------------------- */}
       {isAssetModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="modal-overlay-responsive">
+          <div className="modal-sheet-responsive bg-slate-900 border border-slate-800 shadow-2xl">
+            {/* Mobile Drag Handle */}
+            <div className="sm:hidden flex justify-center pt-2.5 pb-1 bg-slate-950/60 shrink-0">
+              <div className="w-10 h-1.5 rounded-full bg-slate-700/80" />
+            </div>
             
             {/* Modal Header */}
             <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60 shrink-0">
@@ -976,9 +980,9 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
               </div>
               <button
                 onClick={() => setIsAssetModalOpen(false)}
-                className="text-slate-400 hover:text-white cursor-pointer text-xl leading-none"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer transition-colors"
               >
-                &times;
+                <X className="w-4 h-4" />
               </button>
             </div>
 
@@ -992,7 +996,7 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
 
             {/* Tabs (Catalog vs Custom) - Only show if creating new asset */}
             {!editingAsset && (
-              <div className="flex border-b border-slate-800 bg-slate-950/40 px-5 pt-3 gap-2 shrink-0">
+              <div className="flex border-b border-slate-800 bg-slate-950/40 px-4 sm:px-5 pt-3 gap-4 shrink-0">
                 <button
                   type="button"
                   onClick={() => setAssetModalTab('catalog')}
@@ -1022,7 +1026,7 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
 
             {/* TAB 1: Searchable Available Asset Catalog */}
             {assetModalTab === 'catalog' && !editingAsset ? (
-              <div className="flex-1 flex flex-col overflow-hidden p-4 sm:p-5 space-y-3.5">
+              <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-4 sm:p-5 space-y-3.5">
                 
                 {/* Search Bar */}
                 <div className="relative shrink-0">
@@ -1032,8 +1036,7 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
                     placeholder="Search any global asset or ticker (e.g. 2330, NVDA, AAPL, BTC, Gold, VOO, 0050)..."
                     value={catalogSearch}
                     onChange={(e) => setCatalogSearch(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 text-slate-100 pl-9 pr-9 py-2 rounded-xl text-xs focus:outline-none focus:border-emerald-500"
-                    autoFocus
+                    className="w-full bg-slate-950 border border-slate-700 text-slate-100 pl-9 pr-9 py-2.5 rounded-xl text-xs focus:outline-none focus:border-emerald-500"
                   />
                   {isSearchingLive ? (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -1269,14 +1272,14 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
                 </div>
 
                 {/* Footer Notice */}
-                <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs shrink-0">
+                <div className="pt-2.5 border-t border-slate-800 pb-safe flex items-center justify-between text-xs shrink-0 gap-2">
                   <span className="text-slate-500 text-[11px]">
-                    Adding an asset automatically creates its category if it doesn't already exist.
+                    Adding an asset automatically creates its category if it doesn&apos;t already exist.
                   </span>
                   <button
                     type="button"
                     onClick={() => setIsAssetModalOpen(false)}
-                    className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium cursor-pointer shrink-0"
                   >
                     Done
                   </button>
@@ -1285,7 +1288,8 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
               </div>
             ) : (
               /* TAB 2: Custom Asset Form */
-              <form onSubmit={handleSaveAsset} className="p-5 space-y-4 overflow-y-auto">
+              <form onSubmit={handleSaveAsset} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                <div className="p-4 sm:p-5 space-y-4 overflow-y-auto overscroll-contain flex-1">
                 {errorMsg && (
                   <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
                     {errorMsg}
@@ -1806,20 +1810,23 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
                   />
                 </div>
 
-                <div className="pt-2 flex justify-end space-x-2 border-t border-slate-800">
+                </div>
+
+                {/* Sticky Footer */}
+                <div className="shrink-0 p-4 border-t border-slate-800 bg-slate-950/90 pb-safe flex justify-end space-x-2">
                   <button
                     type="button"
                     onClick={() => {
                       if (!editingAsset) setAssetModalTab('catalog');
                       else setIsAssetModalOpen(false);
                     }}
-                    className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-medium text-xs cursor-pointer"
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-medium text-xs cursor-pointer"
                   >
-                    Back to Catalog
+                    {editingAsset ? 'Cancel' : 'Back to Catalog'}
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 rounded-xl bg-emerald-400 text-slate-950 font-bold text-xs shadow-md shadow-emerald-500/20 cursor-pointer"
+                    className="px-5 py-2.5 rounded-xl bg-emerald-400 text-slate-950 font-bold text-xs shadow-md shadow-emerald-500/20 cursor-pointer"
                   >
                     Save Asset
                   </button>
@@ -1835,105 +1842,112 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
       {/* CATEGORY MODAL */}
       {/* ---------------------------------------------------- */}
       {isCategoryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 text-xs">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="modal-overlay-responsive">
+          <div className="modal-sheet-responsive modal-sheet-compact bg-slate-900 border border-slate-800 shadow-2xl text-xs">
+            {/* Mobile Drag Handle */}
+            <div className="sm:hidden flex justify-center pt-2.5 pb-1 bg-slate-950/60 shrink-0">
+              <div className="w-10 h-1.5 rounded-full bg-slate-700/80" />
+            </div>
+
+            <div className="p-4 sm:p-5 flex items-center justify-between border-b border-slate-800 bg-slate-950/60 shrink-0">
               <h3 className="font-bold text-base text-slate-100 flex items-center gap-2">
                 <Tag className="w-4 h-4 text-blue-400" />
                 <span>{editingCategory ? 'Edit Category' : 'Add New Category'}</span>
               </h3>
-              <button onClick={() => setIsCategoryModalOpen(false)} className="text-slate-400 hover:text-white cursor-pointer">
+              <button onClick={() => setIsCategoryModalOpen(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {errorMsg && (
-              <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400">
-                {errorMsg}
-              </div>
-            )}
+            <form onSubmit={handleSaveCategory} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-4 sm:p-5 space-y-4 overflow-y-auto overscroll-contain flex-1">
+                {errorMsg && (
+                  <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400">
+                    {errorMsg}
+                  </div>
+                )}
 
-            <form onSubmit={handleSaveCategory} className="space-y-4">
-              <div>
-                <label className="block text-slate-400 font-semibold mb-1">Category Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Taiwan Equities, US Tech, Cryptocurrencies"
-                  value={catName}
-                  onChange={(e) => setCatName(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-400 font-semibold mb-1">Tied Risk Level</label>
-                <CustomDropdown
-                  value={catRisk}
-                  onChange={(val) => setCatRisk(val as RiskLevel)}
-                  options={[
-                    { value: 'Low', label: 'Low Risk' },
-                    { value: 'Medium', label: 'Medium Risk' },
-                    { value: 'High', label: 'High Risk' },
-                  ]}
-                  className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3 py-2 text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-400 font-semibold mb-1">Chart Tag Color</label>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {colorPalette.map((col) => (
-                    <button
-                      key={col}
-                      type="button"
-                      onClick={() => setCatColor(col)}
-                      className={`w-6 h-6 rounded-full border-2 transition-transform cursor-pointer ${
-                        catColor === col ? 'scale-110 border-white shadow-md' : 'border-transparent hover:scale-105'
-                      }`}
-                      style={{ backgroundColor: col }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-400 font-semibold mb-1">Target Portfolio Allocation % (Optional)</label>
-                <div className="relative">
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Category Name</label>
                   <input
                     type="text"
-                    inputMode="numeric"
-                    autoComplete="off"
-                    placeholder="e.g. 25"
-                    value={catTargetPercent === 0 ? '' : String(catTargetPercent)}
-                    onChange={(e) => {
-                      const clean = e.target.value.replace(/[^0-9.]/g, '').replace(/^0+(?=\d)/, '');
-                      const num = parseFloat(clean);
-                      if (isNaN(num)) {
-                        setCatTargetPercent(0);
-                      } else {
-                        setCatTargetPercent(Math.min(100, num));
-                      }
-                    }}
-                    className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3 py-2 pr-8 text-xs font-mono font-bold focus:outline-none focus:border-emerald-500 tabular-nums"
+                    required
+                    placeholder="e.g. Taiwan Equities, US Tech, Cryptocurrencies"
+                    value={catName}
+                    onChange={(e) => setCatName(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-emerald-500"
                   />
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-500 font-mono text-xs">
-                    %
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Tied Risk Level</label>
+                  <CustomDropdown
+                    value={catRisk}
+                    onChange={(val) => setCatRisk(val as RiskLevel)}
+                    options={[
+                      { value: 'Low', label: 'Low Risk' },
+                      { value: 'Medium', label: 'Medium Risk' },
+                      { value: 'High', label: 'High Risk' },
+                    ]}
+                    className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3 py-2 text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Chart Tag Color</label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {colorPalette.map((col) => (
+                      <button
+                        key={col}
+                        type="button"
+                        onClick={() => setCatColor(col)}
+                        className={`w-7 h-7 rounded-full border-2 transition-transform cursor-pointer ${
+                          catColor === col ? 'scale-110 border-white shadow-md' : 'border-transparent hover:scale-105'
+                        }`}
+                        style={{ backgroundColor: col }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Target Portfolio Allocation % (Optional)</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder="e.g. 25"
+                      value={catTargetPercent === 0 ? '' : String(catTargetPercent)}
+                      onChange={(e) => {
+                        const clean = e.target.value.replace(/[^0-9.]/g, '').replace(/^0+(?=\d)/, '');
+                        const num = parseFloat(clean);
+                        if (isNaN(num)) {
+                          setCatTargetPercent(0);
+                        } else {
+                          setCatTargetPercent(Math.min(100, num));
+                        }
+                      }}
+                      className="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl px-3 py-2.5 pr-8 text-xs font-mono font-bold focus:outline-none focus:border-emerald-500 tabular-nums"
+                    />
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-500 font-mono text-xs">
+                      %
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="pt-2 flex justify-end space-x-2">
+              <div className="shrink-0 p-4 border-t border-slate-800 bg-slate-950/90 pb-safe flex justify-end space-x-2">
                 <button
                   type="button"
                   onClick={() => setIsCategoryModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-medium cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-medium cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-emerald-400 text-slate-950 font-bold cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-emerald-400 text-slate-950 font-bold cursor-pointer"
                 >
                   Save Category
                 </button>
@@ -1951,8 +1965,8 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
         const availableTargets = categories.filter((c) => c.id !== categoryToDeleteGuard.id);
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 text-xs">
+          <div className="modal-overlay-responsive">
+            <div className="modal-sheet-responsive modal-sheet-compact bg-slate-900 border border-slate-800 shadow-2xl p-5 sm:p-6 space-y-4 text-xs pb-safe">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <h3 className="font-bold text-base text-rose-400 flex items-center gap-2">
                   <AlertTriangle className="w-5 h-5" />
@@ -1972,7 +1986,7 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
                   {availableTargets.length > 0 && (
                     <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2.5">
                       <label className="block text-slate-300 font-semibold">Move linked assets to another category:</label>
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <CustomDropdown
                           value={targetCategoryId}
                           onChange={setTargetCategoryId}
@@ -1988,28 +2002,28 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
                         <button
                           type="button"
                           onClick={handleConfirmCategoryReassign}
-                          className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition-all shrink-0 cursor-pointer"
+                          className="px-3.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition-all shrink-0 cursor-pointer"
                         >
-                          Reassign & Keep
+                          Reassign &amp; Keep
                         </button>
                       </div>
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-800 gap-2">
                     <button
                       type="button"
                       onClick={() => setCategoryToDeleteGuard(null)}
-                      className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-medium hover:bg-slate-700 transition-colors cursor-pointer"
+                      className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-medium hover:bg-slate-700 transition-colors cursor-pointer"
                     >
                       Cancel
                     </button>
                     <button
                       type="button"
                       onClick={handleConfirmDirectCategoryDelete}
-                      className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-all cursor-pointer"
+                      className="px-4 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-all cursor-pointer"
                     >
-                      Delete Category & Assets
+                      Delete Category &amp; Assets
                     </button>
                   </div>
                 </div>
@@ -2022,14 +2036,14 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
                     <button
                       type="button"
                       onClick={() => setCategoryToDeleteGuard(null)}
-                      className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-medium hover:bg-slate-700 transition-colors cursor-pointer"
+                      className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-medium hover:bg-slate-700 transition-colors cursor-pointer"
                     >
                       Cancel
                     </button>
                     <button
                       type="button"
                       onClick={handleConfirmDirectCategoryDelete}
-                      className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors cursor-pointer"
+                      className="px-4 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors cursor-pointer"
                     >
                       Confirm Delete
                     </button>
@@ -2049,8 +2063,8 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
         const availableTargets = assets.filter((a) => a.id !== assetToDeleteGuard.id);
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 text-xs">
+          <div className="modal-overlay-responsive">
+            <div className="modal-sheet-responsive modal-sheet-compact bg-slate-900 border border-slate-800 shadow-2xl p-5 sm:p-6 space-y-4 text-xs pb-safe">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <h3 className="font-bold text-base text-rose-400 flex items-center gap-2">
                   <AlertTriangle className="w-5 h-5" />
@@ -2070,7 +2084,7 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
                   {availableTargets.length > 0 && (
                     <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2.5">
                       <label className="block text-slate-300 font-semibold">Transfer historical records to another asset:</label>
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <CustomDropdown
                           value={targetAssetId}
                           onChange={setTargetAssetId}
@@ -2090,28 +2104,28 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
                         <button
                           type="button"
                           onClick={handleConfirmAssetReassign}
-                          className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition-all shrink-0 cursor-pointer"
+                          className="px-3.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition-all shrink-0 cursor-pointer"
                         >
-                          Reassign & Keep
+                          Reassign &amp; Keep
                         </button>
                       </div>
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-800 gap-2">
                     <button
                       type="button"
                       onClick={() => setAssetToDeleteGuard(null)}
-                      className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-medium hover:bg-slate-700 transition-colors cursor-pointer"
+                      className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-medium hover:bg-slate-700 transition-colors cursor-pointer"
                     >
                       Cancel
                     </button>
                     <button
                       type="button"
                       onClick={handleConfirmDirectAssetDelete}
-                      className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-all cursor-pointer"
+                      className="px-4 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-all cursor-pointer"
                     >
-                      Delete Asset & Records
+                      Delete Asset &amp; Records
                     </button>
                   </div>
                 </div>
@@ -2124,14 +2138,14 @@ export const HierarchyManager: React.FC<HierarchyManagerProps> = ({
                     <button
                       type="button"
                       onClick={() => setAssetToDeleteGuard(null)}
-                      className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-medium hover:bg-slate-700 transition-colors cursor-pointer"
+                      className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-medium hover:bg-slate-700 transition-colors cursor-pointer"
                     >
                       Cancel
                     </button>
                     <button
                       type="button"
                       onClick={handleConfirmDirectAssetDelete}
-                      className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors cursor-pointer"
+                      className="px-4 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-colors cursor-pointer"
                     >
                       Confirm Delete
                     </button>

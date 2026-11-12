@@ -893,7 +893,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
               <span className="font-semibold text-slate-300">Capital Deposited</span>
               <span className="text-[11px] text-slate-500">Principal Inflow</span>
             </div>
-            <div className="text-2xl font-bold font-mono tabular-nums text-emerald-400 tracking-tight">
+            <div className="fluid-kpi font-bold font-mono tabular-nums text-emerald-400 tracking-tight">
               {formatCurrency(totalDeposits, currencySymbol, stealthMode)}
             </div>
           </div>
@@ -910,7 +910,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
               <span className="font-semibold text-violet-300">Dividends &amp; Yield</span>
               <span className="text-[11px] text-slate-500">Passive Income</span>
             </div>
-            <div className="text-2xl font-bold font-mono tabular-nums text-violet-300 tracking-tight">
+            <div className="fluid-kpi font-bold font-mono tabular-nums text-violet-300 tracking-tight">
               {formatCurrency(totalDividendsEarned, currencySymbol, stealthMode)}
             </div>
           </div>
@@ -921,7 +921,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
             <button
               type="button"
               onClick={() => handleOpenModal(undefined, 'dividend')}
-              className="text-[11px] font-semibold text-violet-300 hover:text-violet-200 bg-violet-500/15 hover:bg-violet-500/25 px-2.5 py-0.5 rounded-md border border-violet-500/30 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+              className="text-[11px] font-semibold text-violet-300 hover:text-violet-200 bg-violet-500/15 hover:bg-violet-500/25 px-2.5 py-1 rounded-md border border-violet-500/30 transition-colors cursor-pointer whitespace-nowrap shrink-0"
             >
               + Record Yield
             </button>
@@ -935,7 +935,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
               <span className="font-semibold text-amber-400/90">Emergency Fund</span>
               <span className="text-[11px] text-slate-500">Safety Net</span>
             </div>
-            <div className="text-2xl font-bold font-mono tabular-nums text-amber-300 tracking-tight">
+            <div className="fluid-kpi font-bold font-mono tabular-nums text-amber-300 tracking-tight">
               {formatCurrency(totalEmergencyFundBalance, currencySymbol, stealthMode)}
             </div>
           </div>
@@ -945,7 +945,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
               <button
                 type="button"
                 onClick={() => handleQuickCreateEmergencyFund(true)}
-                className="text-[11px] font-semibold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 px-2.5 py-0.5 rounded-md border border-amber-500/30 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                className="text-[11px] font-semibold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 px-2.5 py-1 rounded-md border border-amber-500/30 transition-colors cursor-pointer whitespace-nowrap shrink-0"
               >
                 + Setup EF
               </button>
@@ -964,7 +964,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                     setNote('Emergency Expense');
                     setIsModalOpen(true);
                   }}
-                  className="w-6 h-6 flex items-center justify-center text-sm font-bold text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 rounded-md border border-rose-500/30 transition-colors cursor-pointer leading-none"
+                  className="w-7 h-7 flex items-center justify-center text-sm font-bold text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 rounded-md border border-rose-500/30 transition-colors cursor-pointer leading-none"
                   title="Spend from Emergency Fund (-)"
                 >
                   &minus;
@@ -982,7 +982,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                     setNote('Emergency Fund deposit');
                     setIsModalOpen(true);
                   }}
-                  className="w-6 h-6 flex items-center justify-center text-sm font-bold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 rounded-md border border-amber-500/30 transition-colors cursor-pointer leading-none"
+                  className="w-7 h-7 flex items-center justify-center text-sm font-bold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 rounded-md border border-amber-500/30 transition-colors cursor-pointer leading-none"
                   title="Deposit to Emergency Fund (+)"
                 >
                   +
@@ -1100,9 +1100,9 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
       <div className="fintech-card rounded-xl overflow-hidden">
         
         {/* Header and Controls Bar */}
-        <div className="p-4 sm:p-5 border-b border-slate-800/80 flex flex-col md:flex-row items-center justify-between gap-4 bg-[#080C14]/50">
+        <div className="p-4 sm:p-5 border-b border-slate-800/80 flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 bg-[#080C14]/50">
           <div>
-            <h3 className="text-base font-bold text-slate-100 tracking-tight">
+            <h3 className="fluid-title font-bold text-slate-100 tracking-tight">
               Quantity-Based Transaction Ledger
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
@@ -1110,14 +1110,14 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full lg:w-auto lg:justify-end">
             {/* Month Category Filter (Multi-Choice) */}
             <CustomDropdown
               multiple
               selectedValues={filterMonths}
               onMultiChange={(vals) => setFilterMonths(vals)}
               options={monthFilterOptions}
-              className="w-40 sm:w-48"
+              className="w-full sm:w-44"
               maxHeight="max-h-64"
             />
 
@@ -1127,7 +1127,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
               selectedValues={filterActions}
               onMultiChange={(vals) => setFilterActions(vals as TransactionType[])}
               options={actionFilterOptions}
-              className="w-36 sm:w-40"
+              className="w-full sm:w-36"
               maxHeight="max-h-64"
             />
 
@@ -1137,7 +1137,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
               selectedValues={filterAssetIds}
               onMultiChange={(vals) => setFilterAssetIds(vals)}
               options={assetFilterOptions}
-              className="w-40 sm:w-48"
+              className="col-span-2 sm:col-span-1 w-full sm:w-44"
               maxHeight="max-h-64"
               enableSearch={assets.length >= 6}
             />
@@ -1150,7 +1150,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                   setFilterActions([]);
                   setFilterAssetIds([]);
                 }}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0"
+                className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 min-h-[2.5rem]"
                 title="Clear all active filters"
               >
                 <X className="w-3 h-3" />
@@ -1162,7 +1162,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
             <button
               type="button"
               onClick={() => setSortAsc(!sortAsc)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#080C14] hover:bg-slate-900 text-slate-200 hover:text-white border border-slate-800 hover:border-slate-700 text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0"
+              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#080C14] hover:bg-slate-900 text-slate-200 hover:text-white border border-slate-800 hover:border-slate-700 text-xs font-medium transition-all cursor-pointer whitespace-nowrap shrink-0 min-h-[2.5rem]"
               title={sortAsc ? 'Sort Order: Ascending (Oldest to Newest). Click to switch to Descending.' : 'Sort Order: Descending (Newest to Oldest). Click to switch to Ascending.'}
             >
               {sortAsc ? (
@@ -1176,7 +1176,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
             {/* Add New Transaction Button */}
             <button
               onClick={() => handleOpenModal()}
-              className="flex items-center gap-1.5 text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 px-4 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0"
+              className="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 px-4 py-2 rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 min-h-[2.5rem] shadow-sm shadow-emerald-500/20"
             >
               <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
               <span>Record</span>
@@ -1184,8 +1184,211 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
           </div>
         </div>
 
-        {/* Ledger Table */}
-        <div className="overflow-x-auto">
+        {/* Adaptive Mobile Transaction Cards (< 768px) */}
+        <div className="md:hidden divide-y divide-slate-800/70">
+          {groupedTransactionsByMonth.length === 0 ? (
+            <div className="p-8 text-center text-slate-500">
+              {transactions.length > 0 && (filterMonths.length > 0 || filterActions.length > 0 || filterAssetIds.length > 0) ? (
+                <div className="flex flex-col items-center justify-center space-y-3">
+                  <div className="w-10 h-10 rounded-lg bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-slate-400">
+                    <Filter className="w-5 h-5" />
+                  </div>
+                  <div className="text-sm font-semibold text-slate-300">No transactions match filters</div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilterMonths([]);
+                      setFilterActions([]);
+                      setFilterAssetIds([]);
+                    }}
+                    className="px-3.5 py-2 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-xs font-semibold text-emerald-400 transition-colors cursor-pointer"
+                  >
+                    Reset All Filters
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center space-y-3">
+                  <div className="w-10 h-10 rounded-lg bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-slate-400">
+                    <Coins className="w-5 h-5" />
+                  </div>
+                  <div className="text-sm font-semibold text-slate-300">No transactions recorded yet</div>
+                  <p className="text-xs text-slate-500">
+                    Tap <strong>Record</strong> above to log deposits, conversions, withdrawals, or yield.
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            groupedTransactionsByMonth.map((group) => {
+              const isExpanded = expandedMonths[group.monthKey] ?? (filterMonths.length > 0);
+              return (
+                <div key={`mob-${group.monthKey}`} className="bg-[#080C14]/40">
+                  <button
+                    type="button"
+                    onClick={() => toggleMonthExpand(group.monthKey)}
+                    className="w-full px-4 py-3 flex items-center justify-between gap-2 bg-[#080C14]/90 hover:bg-slate-900/90 transition-colors text-left cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="p-1 rounded bg-slate-800/80 text-slate-400 shrink-0">
+                        {isExpanded ? (
+                          <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                        )}
+                      </span>
+                      {isLiveMonth(group.monthKey) ? (
+                        <span className="inline-flex items-center gap-1.5 font-bold text-emerald-400 text-xs">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                          </span>
+                          <span>Live</span>
+                        </span>
+                      ) : (
+                        <span className="font-bold text-slate-100 text-xs truncate">
+                          {group.monthTitle}
+                        </span>
+                      )}
+                      <span className="text-[11px] text-slate-400 font-mono shrink-0">
+                        ({group.transactions.length})
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[10px] font-mono shrink-0">
+                      {group.addCount > 0 && <span className="text-emerald-400">+{group.addCount}</span>}
+                      {group.convertCount > 0 && <span className="text-sky-400">{group.convertCount}⇄</span>}
+                      {group.withdrawCount > 0 && <span className="text-rose-400">-{group.withdrawCount}</span>}
+                      {group.dividendCount > 0 && <span className="text-violet-300">★{group.dividendCount}</span>}
+                    </div>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="p-3 space-y-2.5 bg-slate-950/40 border-t border-slate-800/60">
+                      {group.transactions.map((tx) => {
+                        const fromAst = tx.fromAssetId ? assetMap.get(tx.fromAssetId) : null;
+                        const toAst = assetMap.get(tx.toAssetId);
+                        const isAdd = tx.action === 'add';
+                        const isDividend = tx.action === 'dividend';
+                        const isWithdraw = tx.action === 'withdraw';
+
+                        return (
+                          <div
+                            key={`mob-tx-${tx.id}`}
+                            className="p-3 rounded-xl bg-[#0B111E] border border-slate-800/90 space-y-2"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-xs font-semibold text-slate-300 tabular-nums">
+                                  {tx.date}
+                                </span>
+                                {isAdd ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                    <ArrowDownLeft className="w-3 h-3" /> Add
+                                  </span>
+                                ) : isWithdraw ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                                    <ArrowUpRight className="w-3 h-3" /> Withdraw
+                                  </span>
+                                ) : isDividend ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-violet-500/15 text-violet-300 border border-violet-500/30">
+                                    <Sparkles className="w-3 h-3" /> Yield
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30">
+                                    <RefreshCw className="w-3 h-3" /> Convert
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenModal(tx)}
+                                  className="p-2 text-slate-400 hover:text-emerald-400 bg-slate-900/90 hover:bg-slate-800 rounded-lg border border-slate-800 transition-colors cursor-pointer"
+                                  title="Edit transaction"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDeletingTxId(tx.id)}
+                                  className="p-2 text-slate-400 hover:text-rose-400 bg-slate-900/90 hover:bg-slate-800 rounded-lg border border-slate-800 transition-colors cursor-pointer"
+                                  title="Delete transaction"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Asset Flow Box */}
+                            <div className="p-2.5 rounded-lg bg-[#080C14] border border-slate-800/80 space-y-1.5 text-xs">
+                              {isAdd ? (
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-slate-400 truncate">
+                                    Deposit &rarr; <strong className="text-slate-100">{toAst?.name || 'Asset'}</strong>
+                                  </span>
+                                  <span className="font-mono font-bold text-emerald-400 tabular-nums shrink-0">
+                                    +{stealthMode ? '••••' : formatNumberWithCommas(tx.toValue)}
+                                  </span>
+                                </div>
+                              ) : isWithdraw ? (
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-slate-300 truncate font-semibold">
+                                    {(fromAst || toAst)?.name || 'Cash Asset'}
+                                  </span>
+                                  <span className="font-mono font-bold text-rose-400 tabular-nums shrink-0">
+                                    -{stealthMode ? '••••' : formatNumberWithCommas(tx.fromValue || tx.toValue)}
+                                  </span>
+                                </div>
+                              ) : isDividend ? (
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-slate-300 truncate">
+                                    {fromAst ? `${fromAst.name} → ` : 'Yield → '}
+                                    <strong className="text-slate-100">{toAst?.name || 'Asset'}</strong>
+                                  </span>
+                                  <span className="font-mono font-bold text-violet-300 tabular-nums shrink-0">
+                                    +{stealthMode ? '••••' : formatNumberWithCommas(tx.toValue)}
+                                  </span>
+                                </div>
+                              ) : (
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-slate-400 truncate">
+                                      From: <strong className="text-slate-200">{fromAst?.name || 'Unknown'}</strong>
+                                    </span>
+                                    <span className="font-mono font-semibold text-rose-400 tabular-nums shrink-0">
+                                      -{stealthMode ? '••••' : formatNumberWithCommas(tx.fromValue)}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-2 border-t border-slate-800/70 pt-1">
+                                    <span className="text-slate-400 truncate">
+                                      To: <strong className="text-slate-100">{toAst?.name || 'Unknown'}</strong>
+                                    </span>
+                                    <span className="font-mono font-bold text-emerald-400 tabular-nums shrink-0">
+                                      +{stealthMode ? '••••' : formatNumberWithCommas(tx.toValue)}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {tx.note && (
+                              <div className="text-[11px] text-slate-400 truncate px-0.5">
+                                {tx.note}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Tablet & PC Full Ledger Table (>= 768px) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-[#080C14] text-slate-400 font-semibold border-b border-slate-800/80 text-[11px]">
@@ -1460,26 +1663,32 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
         </div>
       </div>
 
-      {/* Transaction Add / Edit Modal */}
+      {/* Transaction Add / Edit Modal (Bottom Sheet on Phone/Tablet, Centered Dialog on PC) */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden">
-            
+        <div className="modal-overlay-responsive">
+          <div className="modal-sheet-responsive bg-slate-900 border border-slate-800 shadow-2xl">
+            {/* Mobile Drag Handle */}
+            <div className="sm:hidden flex justify-center pt-2.5 pb-1 bg-slate-950/60 shrink-0">
+              <div className="w-10 h-1.5 rounded-full bg-slate-700/80" />
+            </div>
+
             {/* Modal Header */}
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60 shrink-0">
+            <div className="px-4 py-3.5 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60 shrink-0">
               <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
                 <Coins className="w-5 h-5 text-emerald-400" />
                 <span>{editingTx ? 'Edit Transaction' : 'Record New Transaction'}</span>
               </h3>
               <button
+                type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-200 text-lg leading-none cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
               >
-                &times;
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveModal} className="p-5 space-y-4 overflow-y-auto flex-1">
+            <form onSubmit={handleSaveModal} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-4 sm:p-5 space-y-4 overflow-y-auto overscroll-contain flex-1">
               
               {/* Action Selection Tabs (Add vs Convert vs Dividend/Interest) */}
               <div>
@@ -2217,12 +2426,14 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                 </div>
               )}
 
-              {/* Modal Actions */}
-              <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-800">
+              </div>
+
+              {/* Sticky Modal Actions Footer (Never Stuck Behind Keyboard) */}
+              <div className="shrink-0 p-4 border-t border-slate-800 bg-slate-950/90 pb-safe flex items-center justify-end space-x-2">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-all cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-all cursor-pointer min-h-[2.5rem]"
                 >
                   Cancel
                 </button>
@@ -2234,7 +2445,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                     (action === 'convert' && (!fromAssetId || !convertGuardBandCheck.isValid)) ||
                     (action === 'withdraw' && (!fromAssetId || !convertGuardBandCheck.isValid))
                   }
-                  className={`px-5 py-2 rounded-xl text-xs font-bold shadow-md transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                  className={`px-5 py-2.5 rounded-xl text-xs font-bold shadow-md transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed min-h-[2.5rem] ${
                     action === 'withdraw'
                       ? 'bg-rose-500 hover:bg-rose-400 text-white shadow-rose-500/20'
                       : action === 'dividend'
@@ -2255,8 +2466,8 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
 
       {/* Delete Confirmation Modal */}
       {deletingTxId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4">
+        <div className="modal-overlay-responsive">
+          <div className="modal-sheet-responsive modal-sheet-compact bg-slate-900 border border-slate-800 shadow-2xl p-6 text-center space-y-4">
             <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto">
               <Trash2 className="w-6 h-6" />
             </div>
@@ -2266,16 +2477,16 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                 Are you sure you want to delete this action? Your asset quantity balances and monthly snapshots will automatically recompute.
               </p>
             </div>
-            <div className="flex items-center gap-2 pt-2">
+            <div className="flex items-center gap-2 pt-2 pb-safe">
               <button
                 onClick={() => setDeletingTxId(null)}
-                className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition-all cursor-pointer"
+                className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition-all cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmDelete}
-                className="flex-1 px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-xl shadow-md shadow-rose-600/20 transition-all cursor-pointer"
+                className="flex-1 px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-xl shadow-md shadow-rose-600/20 transition-all cursor-pointer"
               >
                 Delete
               </button>
@@ -2286,17 +2497,21 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
 
       {/* Current Quantity Balances Breakdown Modal Window */}
       {isBalancesModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-150">
-          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl sm:rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="modal-overlay-responsive">
+          <div className="modal-sheet-responsive modal-sheet-wide bg-slate-900 border border-slate-700/80 shadow-2xl">
+            {/* Mobile Drag Handle */}
+            <div className="sm:hidden flex justify-center pt-2.5 pb-1 bg-slate-950/60 shrink-0">
+              <div className="w-10 h-1.5 rounded-full bg-slate-700/80" />
+            </div>
             
             {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+            <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60 shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
                   <Layers className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base sm:text-lg font-bold text-slate-100 flex items-center gap-2">
+                  <h3 className="text-base sm:text-lg font-bold text-slate-100 flex items-center gap-2 flex-wrap">
                     <span>Current Quantity Balances</span>
                     <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/25">
                       {assets.length} Positions
@@ -2309,7 +2524,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
               </div>
               <button
                 onClick={() => setIsBalancesModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer shrink-0"
                 title="Close Window"
               >
                 <X className="w-5 h-5" />
@@ -2317,31 +2532,31 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
             </div>
 
             {/* Quick Metrics Strip */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-4 bg-slate-950/40 border-b border-slate-800/80">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3.5 sm:p-4 bg-slate-950/40 border-b border-slate-800/80 shrink-0">
               <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5">
                 <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Total Positions</div>
-                <div className="text-lg font-bold font-mono text-slate-100 mt-0.5">{assets.length}</div>
+                <div className="text-base sm:text-lg font-bold font-mono text-slate-100 mt-0.5">{assets.length}</div>
               </div>
               <div className="bg-slate-900/90 border border-emerald-500/20 rounded-xl p-2.5">
                 <div className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wider">Active Holdings (&gt;0)</div>
-                <div className="text-lg font-bold font-mono text-emerald-400 mt-0.5">{positiveHoldingsCount}</div>
+                <div className="text-base sm:text-lg font-bold font-mono text-emerald-400 mt-0.5">{positiveHoldingsCount}</div>
               </div>
               <div className="bg-slate-900/90 border border-amber-500/20 rounded-xl p-2.5">
                 <div className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider">Emergency Fund</div>
-                <div className="text-lg font-bold font-mono text-amber-300 mt-0.5">
+                <div className="text-base sm:text-lg font-bold font-mono text-amber-300 mt-0.5 truncate">
                   {formatCurrency(totalEmergencyFundBalance, currencySymbol, stealthMode)}
                 </div>
               </div>
               <div className="bg-slate-900/90 border border-blue-500/20 rounded-xl p-2.5">
                 <div className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider">Est. Total Valuation</div>
-                <div className="text-lg font-bold font-mono text-blue-300 mt-0.5">
+                <div className="text-base sm:text-lg font-bold font-mono text-blue-300 mt-0.5 truncate">
                   {formatCurrency(totalHoldingsValue, currencySymbol, stealthMode)}
                 </div>
               </div>
             </div>
 
             {/* Search and Filter Controls */}
-            <div className="p-3 sm:p-4 border-b border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-slate-950/20">
+            <div className="p-3 sm:p-4 border-b border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-slate-950/20 shrink-0">
               <div className="relative text-xs w-full sm:w-64">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
@@ -2349,7 +2564,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                   placeholder="Search asset, ticker, category..."
                   value={balancesSearch}
                   onChange={(e) => setBalancesSearch(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 text-slate-200 pl-8 pr-3 py-1.5 rounded-xl text-xs focus:outline-none focus:border-amber-400"
+                  className="w-full bg-slate-800 border border-slate-700 text-slate-200 pl-8 pr-3 py-2 rounded-xl text-xs focus:outline-none focus:border-amber-400"
                 />
                 {balancesSearch && (
                   <button
@@ -2372,7 +2587,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                   <button
                     key={tab.id}
                     onClick={() => setBalancesFilterTab(tab.id as any)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
                       balancesFilterTab === tab.id
                         ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
                         : 'bg-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-700'
@@ -2384,8 +2599,8 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
               </div>
             </div>
 
-            {/* Scrollable Holdings Table */}
-            <div className="flex-1 overflow-y-auto overflow-x-auto p-4">
+            {/* Scrollable Holdings Area (Adaptive Cards on Phone, Table on Tablet/PC) */}
+            <div className="flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
               {filteredBalancesAssets.length === 0 ? (
                 <div className="p-12 text-center text-slate-500">
                   <Layers className="w-10 h-10 mx-auto text-slate-600 mb-2" />
@@ -2393,18 +2608,9 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                   <p className="text-xs text-slate-500 mt-1">Try clearing your search query or switching filters.</p>
                 </div>
               ) : (
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800 uppercase tracking-wider text-[10px]">
-                      <th className="p-3">Asset &amp; Category</th>
-                      <th className="p-3 text-right">Current Quantity</th>
-                      <th className="p-3 text-right">Spot Price</th>
-                      <th className="p-3 text-right">Est. Market Value</th>
-                      <th className="p-3 text-center">Guard Band</th>
-                      <th className="p-3 text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60 font-sans text-slate-200">
+                <>
+                  {/* Phone Adaptive Cards (< 768px) */}
+                  <div className="md:hidden space-y-2.5">
                     {filteredBalancesAssets.map((ast) => {
                       const qty = holdings[ast.id] || 0;
                       const cat = categoryMap.get(ast.categoryId);
@@ -2415,142 +2621,233 @@ export const LedgerView: React.FC<LedgerViewProps> = ({
                       const floor = Math.max(0, Number(ast.guardBand) || 0);
 
                       return (
-                        <tr key={ast.id} className="hover:bg-slate-800/40 transition-colors">
-                          {/* Asset Info */}
-                          <td className="p-3">
-                            <div className="flex items-center gap-2">
+                        <div
+                          key={`mob-bal-${ast.id}`}
+                          className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2.5"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
                               <span
                                 className="w-2.5 h-2.5 rounded-full shrink-0"
                                 style={{ backgroundColor: isEF ? '#f59e0b' : (cat?.color || '#3b82f6') }}
                               />
-                              <div>
-                                <div className="font-bold text-slate-100 flex items-center gap-1.5">
-                                  <span>{ast.name}</span>
+                              <div className="min-w-0">
+                                <div className="font-bold text-slate-100 text-xs flex items-center gap-1.5 flex-wrap">
+                                  <span className="truncate">{ast.name}</span>
                                   {ast.tickerSymbol && (
                                     <span className="font-mono text-[10px] text-slate-400 bg-slate-800 px-1.5 py-0.2 rounded border border-slate-700">
                                       {ast.tickerSymbol}
                                     </span>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
-                                  <span>{cat?.name || 'Uncategorized'}</span>
-                                  {isEF ? (
-                                    <span className="text-[9px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.2 rounded">
-                                      Safety Net
-                                    </span>
-                                  ) : isCash ? (
-                                    <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.2 rounded">
-                                      Cash
-                                    </span>
-                                  ) : null}
-                                  {isCash && ast.currency && (
-                                    <span className="font-mono text-[9px] text-slate-500 uppercase">
-                                      [{ast.currency}]
-                                    </span>
-                                  )}
+                                <div className="text-[10px] text-slate-400 mt-0.5">
+                                  {cat?.name || 'Uncategorized'}
                                 </div>
                               </div>
                             </div>
-                          </td>
-
-                          {/* Current Quantity */}
-                          <td className="p-3 text-right font-mono">
-                            <span
-                              className={`text-sm font-bold ${
-                                qty > 0
-                                  ? isEF
-                                    ? 'text-amber-300'
-                                    : 'text-emerald-400'
-                                  : qty < 0
-                                  ? 'text-rose-400'
-                                  : 'text-slate-500'
-                              }`}
-                            >
-                              {stealthMode ? '••••' : formatNumberWithCommas(qty)}
-                            </span>
-                          </td>
-
-                          {/* Spot Price */}
-                          <td className="p-3 text-right font-mono text-slate-300 text-xs">
-                            {isCash && (ast.currency === 'NTD' || ast.currency === 'TWD') && getAssetPriceCurrency(ast) === 'NTD' ? (
-                              <span className="text-slate-500">1.00 (Base)</span>
-                            ) : (
-                              <div className="flex flex-col items-end gap-0.5">
-                                <span className="text-emerald-400 font-semibold">
-                                  {formatAssetUnitPrice(price, ast, stealthMode)}
-                                </span>
-                                {onEditAsset && (
-                                  <select
-                                    value={getAssetPriceCurrency(ast)}
-                                    onChange={(e) => onEditAsset(ast.id, { priceCurrency: e.target.value })}
-                                    onClick={(e) => e.stopPropagation()}
-                                    title="Change display currency for this asset's spot price"
-                                    className="bg-slate-900 border border-slate-700/80 hover:border-indigo-500/60 text-indigo-300 font-mono font-bold text-[9px] rounded px-1 py-0.2 focus:outline-none focus:border-indigo-500 cursor-pointer"
-                                  >
-                                    {SUPPORTED_PRICE_CURRENCIES.map((c) => (
-                                      <option key={c.code} value={c.code}>
-                                        {c.code}
-                                      </option>
-                                    ))}
-                                  </select>
-                                )}
+                            <div className="text-right font-mono shrink-0">
+                              <div className="text-xs font-bold text-slate-100">
+                                {formatCurrency(val, currencySymbol, stealthMode)}
                               </div>
-                            )}
-                          </td>
+                              <div className="text-[10px] text-emerald-400">
+                                Qty: {stealthMode ? '••••' : formatNumberWithCommas(qty)}
+                              </div>
+                            </div>
+                          </div>
 
-                          {/* Estimated Market Valuation */}
-                          <td className="p-3 text-right font-mono font-bold text-slate-100 text-xs">
-                            {formatCurrency(val, currencySymbol, stealthMode)}
-                          </td>
-
-                          {/* Guard Band Floor */}
-                          <td className="p-3 text-center font-mono">
-                            <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                              {floor > 0 ? `≥ ${formatNumberWithCommas(floor)}` : '≥ 0'}
-                            </span>
-                          </td>
-
-                          {/* Actions */}
-                          <td className="p-3 text-center whitespace-nowrap">
-                            <div className="flex items-center justify-center gap-1.5">
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-800/70 text-[11px]">
+                            <div className="flex items-center gap-2 font-mono text-slate-400">
+                              <span>Price: {formatAssetUnitPrice(price, ast, stealthMode)}</span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800">
+                                {floor > 0 ? `≥ ${formatNumberWithCommas(floor)}` : '≥ 0'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
                               {qty > 0 && (
                                 <button
+                                  type="button"
                                   onClick={() => handleOpenConvertWithAsset(ast.id)}
-                                  className="px-2 py-1 bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/30 rounded-lg text-[10px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-                                  title="Convert from this asset"
+                                  className="px-2.5 py-1 bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/30 rounded-lg text-[10px] font-semibold flex items-center gap-1 cursor-pointer"
                                 >
-                                  <RefreshCw className="w-3 h-3" />
-                                  <span>Convert</span>
+                                  <RefreshCw className="w-3 h-3" /> Convert
                                 </button>
                               )}
                               {isCash && (
                                 <button
+                                  type="button"
                                   onClick={() => handleOpenDepositWithAsset(ast.id)}
-                                  className="px-2 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 rounded-lg text-[10px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-                                  title="Deposit cash into this asset"
+                                  className="px-2.5 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 rounded-lg text-[10px] font-semibold flex items-center gap-1 cursor-pointer"
                                 >
-                                  <ArrowDownLeft className="w-3 h-3" />
-                                  <span>Deposit</span>
+                                  <ArrowDownLeft className="w-3 h-3" /> Deposit
                                 </button>
                               )}
                             </div>
-                          </td>
-                        </tr>
+                          </div>
+                        </div>
                       );
                     })}
-                  </tbody>
-                </table>
+                  </div>
+
+                  {/* Tablet & PC Full Table (>= 768px) */}
+                  <table className="hidden md:table w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800 uppercase tracking-wider text-[10px]">
+                        <th className="p-3">Asset &amp; Category</th>
+                        <th className="p-3 text-right">Current Quantity</th>
+                        <th className="p-3 text-right">Spot Price</th>
+                        <th className="p-3 text-right">Est. Market Value</th>
+                        <th className="p-3 text-center">Guard Band</th>
+                        <th className="p-3 text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 font-sans text-slate-200">
+                      {filteredBalancesAssets.map((ast) => {
+                        const qty = holdings[ast.id] || 0;
+                        const cat = categoryMap.get(ast.categoryId);
+                        const isEF = isEmergencyFundAsset(ast);
+                        const isCash = ast.isCash || cat?.isCashCategory;
+                        const price = getAssetBasePrice(ast, undefined, undefined, 32.5);
+                        const val = qty * price;
+                        const floor = Math.max(0, Number(ast.guardBand) || 0);
+
+                        return (
+                          <tr key={ast.id} className="hover:bg-slate-800/40 transition-colors">
+                            {/* Asset Info */}
+                            <td className="p-3">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                                  style={{ backgroundColor: isEF ? '#f59e0b' : (cat?.color || '#3b82f6') }}
+                                />
+                                <div>
+                                  <div className="font-bold text-slate-100 flex items-center gap-1.5">
+                                    <span>{ast.name}</span>
+                                    {ast.tickerSymbol && (
+                                      <span className="font-mono text-[10px] text-slate-400 bg-slate-800 px-1.5 py-0.2 rounded border border-slate-700">
+                                        {ast.tickerSymbol}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
+                                    <span>{cat?.name || 'Uncategorized'}</span>
+                                    {isEF ? (
+                                      <span className="text-[9px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.2 rounded">
+                                        Safety Net
+                                      </span>
+                                    ) : isCash ? (
+                                      <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.2 rounded">
+                                        Cash
+                                      </span>
+                                    ) : null}
+                                    {isCash && ast.currency && (
+                                      <span className="font-mono text-[9px] text-slate-500 uppercase">
+                                        [{ast.currency}]
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Current Quantity */}
+                            <td className="p-3 text-right font-mono">
+                              <span
+                                className={`text-sm font-bold ${
+                                  qty > 0
+                                    ? isEF
+                                      ? 'text-amber-300'
+                                      : 'text-emerald-400'
+                                    : qty < 0
+                                    ? 'text-rose-400'
+                                    : 'text-slate-500'
+                                }`}
+                              >
+                                {stealthMode ? '••••' : formatNumberWithCommas(qty)}
+                              </span>
+                            </td>
+
+                            {/* Spot Price */}
+                            <td className="p-3 text-right font-mono text-slate-300 text-xs">
+                              {isCash && (ast.currency === 'NTD' || ast.currency === 'TWD') && getAssetPriceCurrency(ast) === 'NTD' ? (
+                                <span className="text-slate-500">1.00 (Base)</span>
+                              ) : (
+                                <div className="flex flex-col items-end gap-0.5">
+                                  <span className="text-emerald-400 font-semibold">
+                                    {formatAssetUnitPrice(price, ast, stealthMode)}
+                                  </span>
+                                  {onEditAsset && (
+                                    <select
+                                      value={getAssetPriceCurrency(ast)}
+                                      onChange={(e) => onEditAsset(ast.id, { priceCurrency: e.target.value })}
+                                      onClick={(e) => e.stopPropagation()}
+                                      title="Change display currency for this asset's spot price"
+                                      className="bg-slate-900 border border-slate-700/80 hover:border-indigo-500/60 text-indigo-300 font-mono font-bold text-[9px] rounded px-1 py-0.2 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                                    >
+                                      {SUPPORTED_PRICE_CURRENCIES.map((c) => (
+                                        <option key={c.code} value={c.code}>
+                                          {c.code}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+
+                            {/* Estimated Market Valuation */}
+                            <td className="p-3 text-right font-mono font-bold text-slate-100 text-xs">
+                              {formatCurrency(val, currencySymbol, stealthMode)}
+                            </td>
+
+                            {/* Guard Band Floor */}
+                            <td className="p-3 text-center font-mono">
+                              <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                                {floor > 0 ? `≥ ${formatNumberWithCommas(floor)}` : '≥ 0'}
+                              </span>
+                            </td>
+
+                            {/* Actions */}
+                            <td className="p-3 text-center whitespace-nowrap">
+                              <div className="flex items-center justify-center gap-1.5">
+                                {qty > 0 && (
+                                  <button
+                                    onClick={() => handleOpenConvertWithAsset(ast.id)}
+                                    className="px-2 py-1 bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/30 rounded-lg text-[10px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                                    title="Convert from this asset"
+                                  >
+                                    <RefreshCw className="w-3 h-3" />
+                                    <span>Convert</span>
+                                  </button>
+                                )}
+                                {isCash && (
+                                  <button
+                                    onClick={() => handleOpenDepositWithAsset(ast.id)}
+                                    className="px-2 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 rounded-lg text-[10px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                                    title="Deposit cash into this asset"
+                                  >
+                                    <ArrowDownLeft className="w-3 h-3" />
+                                    <span>Deposit</span>
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </>
               )}
             </div>
 
             {/* Modal Footer */}
-            <div className="p-3 sm:p-4 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between">
+            <div className="p-3 sm:p-4 border-t border-slate-800 bg-slate-950/90 pb-safe flex items-center justify-between shrink-0">
               <span className="text-xs text-slate-400">
                 Showing {filteredBalancesAssets.length} of {assets.length} assets
               </span>
               <button
                 onClick={() => setIsBalancesModalOpen(false)}
-                className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-all cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-all cursor-pointer"
               >
                 Close Window
               </button>
